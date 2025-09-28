@@ -2,7 +2,7 @@
 import os
 import pyautogui
 import imagehash
-from build_dataset.config import CARD_AREAS, OUTPUT_DIR, STRICT_DUP_THR, CANDIDATE_THR, CLUSTER_THR, SCREEN_REGION
+from build_dataset.build_config import CARD_AREAS, OUTPUT_DIR, STRICT_DUP_THR, CANDIDATE_THR, CLUSTER_THR, SCREEN_REGION
 from build_dataset.hash_storage import save_hashes, seen_hashes, cluster_counter, card_group_counter
 
 def save_card(card_image):

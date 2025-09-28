@@ -3,7 +3,7 @@ import unittest
 from unittest.mock import patch
 import streamlit as st
 from annotate_dataset import session_utils
-from annotate_dataset.config import DEFAULT_INPUTS, HELPER_KEYS
+from annotate_dataset.annotate_config import DEFAULT_INPUTS, HELPER_KEYS
 
 class TestSessionUtils(unittest.TestCase):
 

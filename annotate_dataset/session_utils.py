@@ -1,6 +1,6 @@
 # session_utils.py
 import streamlit as st
-from annotate_dataset.config import DEFAULT_INPUTS, HELPER_KEYS
+from annotate_dataset.annotate_config import DEFAULT_INPUTS, HELPER_KEYS
 
 def init_session_state():
     if "group_idx" not in st.session_state:

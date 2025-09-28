@@ -1,7 +1,8 @@
 # ui_components.py
 import streamlit as st
 from PIL import Image
-from annotate_dataset.config import CARD_TYPES, RARITY_OPTIONS, MODIFIER_OPTIONS, HELPER_KEYS
+from config.config import CARD_TYPES
+from annotate_dataset.annotate_config import HELPER_KEYS
 
 def display_card(image_path, width=200):
     st.image(Image.open(image_path), width=width)

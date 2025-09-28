@@ -3,7 +3,7 @@ from unittest.mock import patch, MagicMock
 from PIL import Image
 import pytest
 import build_dataset.card as card
-from build_dataset.config import CARD_AREAS, SCREEN_REGION
+from build_dataset.build_config import CARD_AREAS, SCREEN_REGION
 import os
 
 # -------------------------

@@ -33,7 +33,7 @@ pip install -r requirements.txt
 This launches the annotation interface in your browser:
 
 ```bash
-streamlit run annotate_dataset/main.py
+python -m streamlit run annotate_dataset/main.py
 ```
 
 Follow the on-screen interface to:

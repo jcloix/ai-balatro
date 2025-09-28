@@ -3,7 +3,7 @@ import os
 import json
 from PIL import Image
 import imagehash
-from build_dataset.config import HASH_FILE
+from build_dataset.build_config import HASH_FILE
 
 seen_hashes = []
 cluster_counter = 0

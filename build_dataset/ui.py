@@ -2,7 +2,7 @@
 import tkinter as tk
 from build_dataset.card import capture_cards, save_card_forced
 from build_dataset.automation import start_auto, stop_auto
-from build_dataset.config import SCREEN_REGION, CARD_AREAS
+from build_dataset.build_config import SCREEN_REGION, CARD_AREAS
 
 overlays = []
 

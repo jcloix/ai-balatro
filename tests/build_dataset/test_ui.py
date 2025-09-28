@@ -4,7 +4,7 @@ import pytest
 import tkinter as tk
 
 import build_dataset.ui as ui
-from build_dataset.config import CARD_AREAS, SCREEN_REGION
+from build_dataset.build_config import CARD_AREAS, SCREEN_REGION
 
 
 def test_toggle_regions_shows_and_hides():

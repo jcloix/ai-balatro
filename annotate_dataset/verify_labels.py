@@ -2,7 +2,7 @@ import streamlit as st
 import os
 from collections import defaultdict
 from PIL import Image
-from annotate_dataset.config import DATASET_DIR, LABELS_FILE
+from config.config import DATASET_DIR
 from annotate_dataset.data_loader import load_labels
 
 # --------------------------

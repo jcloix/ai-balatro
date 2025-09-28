@@ -4,7 +4,7 @@ from PIL import Image
 import threading
 
 import build_dataset.automation as automation
-from build_dataset.config import CARD_AREAS, AUTO_INTERVAL
+from build_dataset.build_config import CARD_AREAS, AUTO_INTERVAL
 
 
 def test_start_stop_auto_sets_flag():

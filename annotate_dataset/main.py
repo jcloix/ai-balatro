@@ -1,10 +1,11 @@
 # main.py
-import sys
+
 import os
 import json
 import streamlit as st
 from PIL import Image
-from annotate_dataset.config import DATASET_DIR, LABELS_FILE, DEFAULT_INPUTS, HELPER_KEYS, CARD_TYPES, RARITY_OPTIONS, MODIFIER_OPTIONS
+from config.config import DATASET_DIR, LABELS_FILE, CARD_TYPES, RARITY_OPTIONS, MODIFIER_OPTIONS
+from annotate_dataset.annotate_config import HELPER_KEYS
 from annotate_dataset.data_loader import load_labels, list_images, build_maps, get_unlabeled_groups, parse_ids, compute_unique_by_type
 from annotate_dataset.session_utils import init_session_state, clear_helpers, clear_fields
 from annotate_dataset.ui_components import display_card, render_sidebar, helper_selectboxes

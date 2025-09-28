@@ -1,7 +1,7 @@
 # data_loader.py
 import os
 import json
-from annotate_dataset.config import DATASET_DIR, LABELS_FILE, CARD_TYPES
+from config.config import DATASET_DIR, LABELS_FILE, CARD_TYPES
 
 def load_labels():
     if os.path.exists(LABELS_FILE):

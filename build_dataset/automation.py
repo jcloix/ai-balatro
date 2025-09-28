@@ -4,7 +4,7 @@ import threading
 import socket
 import pyautogui
 from build_dataset.card import save_card, save_card_forced, capture_cards
-from build_dataset.config import SCREEN_REGION, CARD_AREAS, AUTO_INTERVAL
+from build_dataset.build_config import SCREEN_REGION, CARD_AREAS, AUTO_INTERVAL
 
 auto_running = False
 last_screen_hash = None
