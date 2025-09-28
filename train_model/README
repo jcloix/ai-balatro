@@ -1,0 +1,87 @@
+# train_model 🧠
+
+The `train_model` module is part of the **Balatro** project.  
+Its purpose is to **train an AI model to recognize cards** based on the annotated dataset.  
+The trained model can later be used for real-time card identification with `identify_card`.
+
+---
+
+## 🚀 Features
+
+- Load annotated dataset created with `annotate_dataset`
+- Train a model to recognize cards
+- Support for detecting **polychrome variations**
+- Save trained models for later inference
+- Configurable training parameters (epochs, batch size, etc.)
+
+---
+
+## 🛠 Installation
+
+Make sure you are inside the Balatro project folder and dependencies are installed:
+
+```bash
+cd balatro
+pip install -r requirements.txt
+```
+
+---
+
+## 🎯 Usage
+
+Run the module directly:
+
+```bash
+python -m train_dataset
+```
+
+### Example workflow
+
+1. Prepare your dataset using:
+   - `build_dataset` (capture images)
+   - `annotate_dataset` (organize & label)
+
+2. Start training:
+   ```bash
+   python -m train_dataset --epochs 20 --batch-size 32
+   ```
+
+3. The trained model will be saved in the `models/` directory.
+
+4. Use the trained model with `identify_card` for real-time recognition.
+
+---
+
+## ⚙️ Options
+
+- `--epochs <int>` → Number of training epochs (default: 10)  
+- `--batch-size <int>` → Batch size for training (default: 32)  
+- `--output <path>` → Path to save the trained model (default: `models/card_model.pth`)  
+
+---
+
+## 🔄 Workflow Context
+
+```text
+build_dataset  --->  annotate_dataset  --->  train_model  --->  identify_card
+```
+
+---
+
+## 📌 Notes
+
+- Currently supports basic image classification workflows.  
+- Polychrome recognition is experimental and may require dataset extensions.  
+- Future versions may support transfer learning or custom model architectures.  
+
+---
+
+## 🤝 Contributing
+
+Contributions for improving the training pipeline, model accuracy, or adding advanced features (e.g., augmentation, polychrome support) are welcome.  
+
+---
+
+## 📄 License
+
+Specify your license here (MIT, GPL, etc.).

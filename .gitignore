@@ -1,0 +1,49 @@
+# ----------------------------
+# Python
+# ----------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+*.log
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.env
+pip-wheel-metadata/
+*.whl
+
+# Jupyter / notebooks
+.ipynb_checkpoints/
+
+# ----------------------------
+# VS Code
+# ----------------------------
+.vscode/
+.history/
+
+# ----------------------------
+# Streamlit
+# ----------------------------
+.streamlit/
+
+# ----------------------------
+# Project-specific
+# ----------------------------
+# Ignore large datasets and screenshots
+data/
+*.png
+*.jpg
+*.jpeg
+
+# Keep a sample folder if you want to show example cards
+!data/samples/

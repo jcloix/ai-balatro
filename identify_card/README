@@ -1,0 +1,82 @@
+# identify_card 🔎
+
+The `identify_card` module is part of the **Balatro** project.  
+Its purpose is to **use the trained AI model to identify cards in real scenarios**.  
+With this module, you can load a trained model, analyze screen captures, and detect which cards are displayed.
+
+---
+
+## 🚀 Features
+
+- Load a trained model from `train_model`
+- Detect which card is shown in a given image or screenshot
+- Support for polychrome recognition (if trained)
+- Provide easy-to-use functions for integration into other scripts
+- Can be extended for **real-time screen monitoring**
+
+---
+
+## 🛠 Installation
+
+Make sure you are inside the Balatro project folder and dependencies are installed:
+
+```bash
+cd balatro
+pip install -r requirements.txt
+```
+
+---
+
+## 🎯 Usage
+
+Run the module directly:
+
+```bash
+python -m identify_card --image path/to/card.png
+```
+
+Example Python usage:
+
+```python
+from identify_card import identify
+
+card_id, confidence = identify("screenshots/card_001.png")
+
+print(f"Detected card: {card_id} (confidence: {confidence:.2f})")
+```
+
+---
+
+## ⚙️ Options
+
+- `--image <path>` → Path to the image/screenshot to analyze  
+- `--model <path>` → Path to the trained model (default: `models/card_model.pth`)  
+- `--threshold <float>` → Minimum confidence threshold (default: 0.8)  
+
+---
+
+## 🔄 Workflow Context
+
+```text
+build_dataset  --->  annotate_dataset  --->  train_model  --->  identify_card
+```
+
+---
+
+## 📌 Notes
+
+- Works best if the dataset is well-annotated and trained for polychrome.  
+- Can be integrated with `utils` functions for continuous monitoring.  
+- Future improvements: real-time screen capture loop, GPU acceleration.  
+
+---
+
+## 🤝 Contributing
+
+Suggestions and pull requests for real-time improvements, new detection strategies, or better performance are welcome.  
+
+---
+
+## 📄 License
+
+Specify your license here (MIT, GPL, etc.).

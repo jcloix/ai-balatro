@@ -1,0 +1,142 @@
+# Balatro 🃏
+
+![Python](https://img.shields.io/badge/Python-3.10+-blue) ![License](https://img.shields.io/badge/License-MIT-green)
+
+Balatro is a project designed to learn and experiment with AI in a real scenario: identifying cards. From dataset creation to real-time card recognition, Balatro provides a full workflow with modular design.
+
+---
+
+## 🚀 Features
+
+- Capture card screenshots and organize a dataset
+- Annotate cards with proper labels
+- Train an AI model to identify cards and their polychrome
+- Identify cards in real-time scenarios
+- Useful utility functions for automated card detection
+
+---
+
+## 🗂 Project Modules
+
+- **build_dataset**  
+  Capture screenshots of cards with a minimal UI and pseudo-grouping functions.
+
+- **annotate_dataset**  
+  Organize and label the dataset properly. A more advanced UI may be implemented.
+
+- **train_model**  
+  Train AI models to identify cards and recognize polychrome.
+
+- **identify_card**  
+  Functions for real-time card identification.
+
+- **utils**  
+  Helper functions, e.g., check if a specific `<card_id>` is displayed on the screen.
+
+---
+
+## 🛠 Installation
+
+Make sure Python 3.10+ is installed. Then:
+
+```bash
+TODO
+git clone https://github.com/yourusername/balatro.git
+cd balatro
+pip install -r requirements.txt
+```
+
+---
+
+## 🎯 Usage
+
+### 1️⃣ Build the dataset
+```bash
+python -m build_dataset
+```
+
+### 2️⃣ Annotate the dataset
+```bash
+python -m annotate_dataset
+```
+
+### 3️⃣ Train the AI
+```bash
+python -m train_model
+```
+
+### 4️⃣ Identify cards in real scenario
+```bash
+python -m identify_card
+```
+
+### 5️⃣ Use helper functions
+```python
+from utils import is_card_displayed
+
+if is_card_displayed("card_123"):
+    print("Card 123 is currently on screen!")
+```
+
+---
+
+## 🔄 Workflow Diagram
+
+
+                        ┌────────────────────┐
+                        │   build_dataset    │
+                        │  (data capture)    │
+                        │  [optional UI:     │
+                        │   screenshot,      │
+                        │   temp grouping]   │
+                        └────────┬──────────┘
+                                 │
+                      Screenshots / Temporary Groups
+                                 │
+                        ┌────────▼──────────┐
+                        │ annotate_dataset  │
+                        │ (organize & label │
+                        │  dataset)         │
+                        │  [UI: drag & drop,│
+                        │   assign labels,  │
+                        │   verify]         │
+                        └────────┬──────────┘
+                                 │
+                    Labeled & Annotated Dataset (CSV, JSON, etc.)
+                                 │
+                        ┌────────▼──────────┐
+                        │   train_model     │
+                        │ (train AI on      │
+                        │ annotated data)   │
+                        └────────┬──────────┘
+                                 │
+                        Trained Model Files
+                                 │
+                        ┌────────▼──────────┐
+                        │  identify_card    │
+                        │ (inference /      │
+                        │ real-time use)    │
+                        │  [optional UI:    │
+                        │   highlight cards]│
+                        └────────┬──────────┘
+                                 │
+                 Detected Cards / Polychrome Info
+                                 │
+                        ┌────────▼──────────┐
+                        │      utils        │
+                        │ (shared helpers)  │
+                        │image preprocessing│
+                        │,logging, file I/O │
+                        └───────────────────┘
+
+## 🤝 Contributing
+
+Open issues, submit pull requests, suggest improvements for UI and AI accuracy.
+
+---
+
+## 📄 License
+
+Specify your license here (MIT, GPL, etc.).
+
+
