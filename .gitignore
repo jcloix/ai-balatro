@@ -41,6 +41,7 @@ pip-wheel-metadata/
 # ----------------------------
 # Ignore large datasets and screenshots
 data/
+backup_data/
 *.png
 *.jpg
 *.jpeg

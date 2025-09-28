@@ -1,0 +1,85 @@
+# augment_dataset 🎨
+
+The `augment_dataset` module is part of the **Balatro** project.
+It helps you **expand your labeled card dataset** by generating multiple synthetic variations of each card image.
+This allows your AI model to **learn robust representations** even with a small number of original screenshots.
+
+---
+
+## 🚀 Features
+
+* Load labeled images from the dataset (`annotate_dataset`)
+* Apply a variety of augmentations:
+
+  * Rotation
+  * Cropping / resizing
+  * Flipping (horizontal/vertical)
+  * Brightness and contrast adjustments
+  * Blur and noise
+* Save augmented images with the same labeling metadata
+* Configurable augmentation parameters for flexibility
+
+---
+
+## 🛠 Installation
+
+Make sure you are inside the Balatro project folder and dependencies are installed:
+
+```bash
+cd balatro
+pip install -r requirements.txt
+```
+
+---
+
+## 🎯 Usage
+
+Run the augmentation script:
+
+```bash
+python -m augment_dataset.main
+```
+
+Or with custom parameters:
+
+```bash
+python -m augment_dataset.main --input dataset/labeled --output dataset/augmented --n 30
+```
+
+The script will:
+
+1. Load all labeled images from your dataset folder
+2. Apply configured augmentations to each image
+3. Save the augmented images in a separate folder (or subfolder per card)
+4. Maintain the original labels for each augmented image
+
+---
+
+## 📌 Notes
+
+* **Augmentation must be run after labeling** (`annotate_dataset`) to ensure correct card metadata.
+* You can configure:
+
+  * Number of variations per image
+  * Types of augmentations applied
+  * Output folder for augmented images
+* Augmentation is optional, but **highly recommended** if you have few images per card
+* The augmented images can then be used in `train_model` to improve AI performance
+
+---
+
+## 🤝 Contributing
+
+Feel free to contribute by:
+
+* Adding new augmentation types
+* Improving augmentation efficiency
+* Adding logging or progress display
+
+Open issues or pull requests are welcome.
+
+---
+
+## 📄 License
+
+Specify your license here (MIT, GPL, etc.).

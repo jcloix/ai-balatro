@@ -105,8 +105,20 @@ if is_card_displayed("card_123"):
                     Labeled & Annotated Dataset (CSV, JSON, etc.)
                                  │
                         ┌────────▼──────────┐
+                        │ augment_dataset   │
+                        │ (data augmentation│
+                        │  & synthetic      │
+                        │  variations)      │
+                        │  [rotate, crop,   │
+                        │   brightness, etc.]│
+                        └────────┬──────────┘
+                                 │
+                    Augmented Dataset (ready for training)
+                                 │
+                        ┌────────▼──────────┐
                         │   train_model     │
                         │ (train AI on      │
+                        │ augmented &       │
                         │ annotated data)   │
                         └────────┬──────────┘
                                  │
