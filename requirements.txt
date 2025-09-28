@@ -1,4 +1,18 @@
-streamlit
-Pillow
-imagehash
-pyautogui
+# TO check versions: pip freeze | Select-String "streamlit|Pillow|ImageHash|pyautogui|tqdm|matplotlib"
+# For image hashing and similarity checks
+ImageHash==4.3.2
+
+# Image processing (rotation, brightness/contrast, flips, etc.)
+Pillow==11.3.0
+
+# For GUI automation (screenshot capture)
+PyAutoGUI==0.9.54
+
+# Web-based UI for dataset annotation and testing
+streamlit==1.50.0
+
+# Progress bars in CLI
+tqdm==4.67.1
+
+# Plotting and visualization
+matplotlib==3.10.6

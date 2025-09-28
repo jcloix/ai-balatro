@@ -34,16 +34,17 @@ pip install -r requirements.txt
 
 ## 🎯 Usage
 
+### 1️⃣ Run the augmentation
 Run the augmentation script:
 
 ```bash
-python -m augment_dataset.main
+python augment_dataset/main.py
 ```
 
 Or with custom parameters:
 
 ```bash
-python -m augment_dataset.main --input dataset/labeled --output dataset/augmented --n 30
+python augment_dataset/main.py --input data/test_subset --output data/test_augmented --n 5 --seed 42
 ```
 
 The script will:
@@ -52,6 +53,11 @@ The script will:
 2. Apply configured augmentations to each image
 3. Save the augmented images in a separate folder (or subfolder per card)
 4. Maintain the original labels for each augmented image
+
+### 2️⃣ Verify the results
+```bash
+python augment_dataset/visual_check.py
+```
 
 ---
 
