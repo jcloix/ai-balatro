@@ -4,7 +4,9 @@
 # Dataset paths
 # --------------------------
 DATASET_DIR = "data/unlabeled"
-LABELS_FILE = "annotate_dataset/labels.json"
+DATASET_AUGMENTED_DIR = "data/augmented"
+AUGMENTED_LABELS_FILE = "data/augmented.json"
+LABELS_FILE = "data/labels.json"
 
 # --------------------------
 # Card types
