@@ -145,6 +145,143 @@ if is_card_displayed("card_123"):
                         │,logging, file I/O │
                         └───────────────────┘
 
+
+## Detailed Step-by-Step Workflow
+
+### 1️⃣ Data Preparation
+
+1. **Capture raw screenshots**
+
+   * Screenshots taken from real gameplay.
+   * Stored in `data/unlabeled/`.
+
+2. **Annotate dataset**
+
+   * Use `annotate_dataset` to label each card.
+   * Labels stored in `data/labels.json`.
+   * Each card gets unique ID, type, rarity, and modifier.
+
+3. **Optional offline data augmentation**
+
+   * Apply transformations (rotation, brightness, cropping, etc.).
+   * Augmented images stored in `data/augmented/`.
+   * Metadata stored in `data/augmented.json`.
+
+4. **Merge labels**
+
+   * Combine original + augmented labels in memory.
+   * Result: `merged_labels.json` used for training.
+
+---
+
+### 2️⃣ Dataset Loading
+
+1. Initialize `CardDataset`
+
+   * Loads image paths + labels from the merged JSON mapping in memory and save the merged JSON to disk.
+   * Provide the image paths that will be loaded and transformed on-the-fly when accessed by the DataLoader during training or validation.
+   * Define the image transforms (augmentation, normalization, resizing) that will be applied later for training and validation.
+
+2. Split into training and validation sets
+
+   * Split the dataset into training and validation subsets using `Config.VAL_SPLIT`.
+   * Create DataLoaders for each subset:
+     * Train loader → shuffled, batched.
+     * Validation loader → not shuffled, batched.
+
+---
+
+### 3️⃣ Initialize Model and Training Parameters
+
+1. **Load pretrained ResNet18 (convolutional neural network)**
+
+   * `resnet18(pretrained=True)`
+
+2. **Replace final layer**
+
+   * Replace ResNet18’s original final layer (1000 outputs) with a new linear layer:
+
+```python
+model.fc = nn.Linear(num_features, NUM_CLASSES)
+```
+
+* `num_features` → input features to the layer (512 for ResNet18)
+* `NUM_CLASSES` → number of unique cards in our dataset
+* This allows the model to output predictions for our specific card classes instead of ImageNet classes.
+
+3. **Send model to device**
+
+   * GPU if available (`cuda`), else CPU
+
+4. **Setup training parameters**
+
+   * **Loss function:** `CrossEntropyLoss`
+   * **Optimizer:** `Adam` with learning rate from config/arguments
+   * **Scheduler:** StepLR to adjust learning rate periodically
+   * **Mixed precision scaler:** `GradScaler` for faster GPU training (optional)
+   * **Early stopping:** Monitors validation loss to stop training if no improvement
+   * **TensorBoard writer:** Logs metrics for visualization
+
+---
+
+### 4️⃣ Training Loop
+
+For each epoch:
+
+1. **Train one epoch**
+
+   * Iterate through training loader batches.
+   * Move images + labels to device. (GPU or CPU)
+   * Forward pass → compute predictions.
+   * Compute loss (`CrossEntropyLoss`).
+   * Backward pass → compute gradients.
+   * Optimizer step → update weights.
+   * Compute average training loss.
+
+2. **Validate**
+
+   * Iterate through validation loader batches.
+   * Forward pass only (no gradients).
+   * Compute validation loss.
+   * Average validation loss.
+
+3. **Logging**
+
+   * Print epoch stats (train_loss, val_loss).
+   * Optional: log to TensorBoard.
+
+4. **Learning rate scheduling**
+
+   * Adjusting the learning rate during training can help the model converge faster
+   * Step scheduler (optional).
+
+5. **Checkpointing**
+
+   * Save best model if val loss improves (`best_model.pth`).
+   * Optional: periodic checkpoints.
+
+6. **Early stopping**
+
+   * Track consecutive epochs without improvement.
+   * Stop if validation loss doesn’t improve for `patience` epochs.
+
+---
+
+### 5️⃣ End of Training
+
+1. Save final model (optional).
+2. Model ready for inference or embedding extraction.
+
+---
+
+### Key Notes
+
+* **Transforms**: offline + on-the-fly augmentations.
+* **Early stopping + checkpointing** prevents overfitting.
+* **Validation set** ensures generalization.
+* **Modular design** separates dataset, model, and training steps for clarity and extendability.
+
+
 ## 📦 Handling of Data & Metadata
 
 Balatro keeps a strict separation between **raw data**, **annotations**, **augmentations**, and **training sets**. This ensures clarity and reproducibility.
@@ -243,6 +380,8 @@ data/test_subset/*.png
 * **Training is reproducible** → merge the two JSONs in memory and feed both folders to your DataLoader.
 
 ---
+
+
 
 ## 🤝 Contributing
 

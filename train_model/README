@@ -32,7 +32,7 @@ pip install -r requirements.txt
 Run the module directly:
 
 ```bash
-python -m train_dataset
+python -m train_model
 ```
 
 ### Example workflow
@@ -43,7 +43,7 @@ python -m train_dataset
 
 2. Start training:
    ```bash
-   python -m train_dataset --epochs 20 --batch-size 32
+   python -m train_model --epochs 20 --batch-size 32
    ```
 
 3. The trained model will be saved in the `models/` directory.
@@ -65,6 +65,190 @@ python -m train_dataset
 ```text
 build_dataset  --->  annotate_dataset  --->  train_model  --->  identify_card
 ```
+
+## File structure and interactions
+
+train_model/
+├── train.py              # Main training loop
+│   ├─ parse_args()       # CLI arguments
+│   ├─ load_dataloaders() # Merge labels + create datasets + train/val loaders
+│   ├─ train_one_epoch()  # Training for one epoch
+│   ├─ validate()         # Compute validation loss
+│   ├─ log_epoch_stats()  # Console + TensorBoard logging
+│   ├─ handle_checkpoints() / save_checkpoint()  # Best/periodic model saving
+│   └─ main()             # Main loop: epochs, scheduler, early stopping
+│
+├── dataset.py            # Dataset utilities
+│   ├─ CardDataset        # Loads images and labels
+│   ├─ from_labels_dict() / from_label_paths()  # Constructors
+│   ├─ load_merged_labels()  # Merge original + augmented labels
+│   └─ get_train_val_loaders() # Split dataset + create DataLoaders
+│
+├── train_utils.py        # Training helper utilities
+│   ├─ TrainingState      # Encapsulates model, optimizer, scheduler, scaler, writer, early stopping
+│   ├─ EarlyStopping      # Tracks no-improvement epochs
+│   ├─ build_model()      # Pretrained ResNet18 + replace final layer + move to device
+│   └─ prepare_training() # Build model + optimizer + scheduler + scaler + early stopping + TensorBoard
+│
+└── train_config.py       # Configs
+    ├─ TransformConfig    # Predefined image transforms (train/test/none)
+    └─ Config             # Hyperparameters: epochs, batch_size, learning_rate, val_split, num_classes, transform mapping
+
+
+# Data Collection & Training Strategy Decisions – Balatro
+
+This document outlines the decisions and trade-offs for building the dataset of cards and training an AI model effectively. The goal is to balance realism, efficiency, and robustness.
+
+---
+
+##  Training strategies
+
+### 1. Framework Choice
+
+**Option: PyTorch**
+
+* **Advantages**:
+
+  * Flexible, great for custom DataLoaders (fits Balatro’s dataset structure).
+  * TorchVision has strong support for augmentations.
+  * Widely used for research and experimentation.
+* **Constraints**:
+
+  * Slightly less “plug-and-play” than TensorFlow/Keras.
+
+**Option: TensorFlow / Keras**
+
+* **Advantages**:
+
+  * High-level APIs (`model.fit`) make training easy.
+  * Strong visualization/debugging tools (TensorBoard).
+* **Constraints**:
+
+  * Harder integration with custom dataset structures.
+  * Less flexible for embedding/similarity-based experiments.
+
+✅ **Decision**: Use **PyTorch** for modularity and flexibility.
+
+---
+
+### 2. Image Size & Preprocessing
+
+**Option: Resize to fixed size (224×224)**
+
+* **Advantages**: Matches pretrained model input; simple pipeline.
+* **Constraints**: Minor distortion for non-square cards.
+
+**Option: Keep native aspect ratio, pad to square**
+
+* **Advantages**: Preserves exact proportions.
+* **Constraints**: More complex preprocessing; still resized for pretrained models.
+
+✅ **Decision**: Resize all images to **224×224**, normalized to **ImageNet mean/std**.
+
+---
+
+### 3. Runtime Augmentation
+
+**Option: Only offline augmentation**
+
+* **Advantages**: Fully reproducible dataset; simpler training loop.
+* **Constraints**: Limited variety → risk of overfitting.
+
+**Option: Only runtime (on-the-fly) augmentation**
+
+* **Advantages**: Fresh variations each epoch; more robust.
+* **Constraints**: Less reproducibility; slower training.
+
+**Option: Hybrid (offline + runtime)**
+
+* **Advantages**: Large reproducible base dataset + stochastic variety at training time.
+* **Constraints**: Slightly more complex setup.
+
+✅ **Decision**: **Hybrid** → offline augmentations expand dataset, runtime augmentations add randomness. Avoid horizontal flips (text orientation issue).
+
+---
+
+### 4. Batch Size & Learning Rate
+
+**Option: Batch size 32, LR 1e-4 (Adam)**
+
+* **Advantages**: Stable, works for most GPUs.
+* **Constraints**: May need tuning later.
+
+**Option: Large batch (64–128)**
+
+* **Advantages**: Faster per epoch; smoother gradients.
+* **Constraints**: Higher memory requirements.
+
+**Option: Small batch (8–16)**
+
+* **Advantages**: Works on limited GPUs; more gradient noise (sometimes helps).
+* **Constraints**: Slower, noisier convergence.
+
+✅ **Decision**: Start with **batch size 32**, **LR 1e-4**, **Adam optimizer**. Adjust based on dataset scale and GPU.
+
+---
+
+### 5. Early Stopping & Checkpointing
+
+**Option: No early stopping, fixed epochs**
+
+* **Advantages**: Simple.
+* **Constraints**: Risk of overfitting / wasted compute.
+
+**Option: Early stopping (monitor val loss)**
+
+* **Advantages**: Prevents overfitting; saves best model.
+* **Constraints**: Slightly more complex.
+
+**Option: Checkpoint every N epochs**
+
+* **Advantages**: Keeps rollback history.
+* **Constraints**: Higher disk usage.
+
+✅ **Decision**: Use **early stopping + best-model checkpoint**. Optionally save periodic checkpoints for debugging.
+
+## Future Considerations
+
+* **Embedding-based similarity search**:
+
+  * Train a feature extractor to produce embeddings for each card.
+  * Use cosine similarity or k-NN to identify rare/low-sample cards.
+  * Reduces dependency on large datasets for each unique card.
+
+* **Polychrome recognition**:
+
+  * Extend dataset to include polychrome variations.
+  * Add separate labels or multi-task outputs for color variants.
+
+* **Few-shot / transfer learning**:
+
+  * For new card releases or low-sample cards, leverage pretrained backbones.
+  * Fine-tune embeddings on small subsets.
+
+* **Advanced augmentations**:
+
+  * Lighting, perspective distortion, occlusion.
+  * Helps improve model generalization to real gameplay.
+
+* **Logging and experiment tracking**:
+
+  * Keep experiment metadata (hyperparameters, augmentations, results).
+  * Facilitates reproducibility and iterative improvements.
+
+---
+
+## Summary
+
+* **Data**: Begin with collection screen captures, expand with gameplay samples.
+* **Framework**: PyTorch.
+* **Preprocessing**: 224×224, ImageNet normalization.
+* **Augmentation**: Hybrid (offline + runtime, no flips).
+* **Training defaults**: Batch 32, LR 1e-4, Adam, ~20 epochs.
+* **Regularization**: Early stopping + checkpointing.
+* **Future-proof**: Embeddings, few-shot learning, polychrome support, advanced augmentation.
+
+
 
 ---
 

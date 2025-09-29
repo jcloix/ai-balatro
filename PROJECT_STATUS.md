@@ -3,9 +3,9 @@
 ## Current Modules
 - build_dataset: capture screenshots
 - annotate_dataset: labeling UI
-- augment_dataset: data augmentation (planned)
-- train_model: AI training
-- identify_card: real-time inference
+- augment_dataset: data augmentation 
+- train_model: AI training 
+- identify_card: real-time inference (planned)
 - utils: shared helpers
 - config: Global configuration
 
@@ -29,6 +29,7 @@
   ├── build_dataset/
   ├── train_model/
   ├── identify_card/
+  ├── data/
   └── utils/
 - Screenshots folder is gitignored
 
