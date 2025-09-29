@@ -31,12 +31,12 @@
   ├── identify_card/
   ├── data/
   └── utils/
-- Screenshots folder is gitignored
+- Screenshots folders is gitignored
 
 ## Next Steps / Ideas
-- Data augmentation module
-- Few-shot / transfer learning for low-sample cards
-- Possibly embedding + similarity search
+- Implement the identify card
+- Test on a small subset
+- Fine tune the model
 
 # 📝 Project Decisions - Balatro
 
