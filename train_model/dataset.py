@@ -5,7 +5,7 @@ from PIL import Image
 import json
 import os
 
-def load_merged_labels(original_labels_path, augmented_labels_path=None, save_path=None):
+def load_merged_labels(original_labels_path, augmented_labels_path=None, save_path=None, subset_only=True):
     """
     Load original and augmented labels and merge them in memory.
     If save_path is provided, write the merged mapping to that file.
@@ -16,6 +16,12 @@ def load_merged_labels(original_labels_path, augmented_labels_path=None, save_pa
     if augmented_labels_path and os.path.exists(augmented_labels_path):
         with open(augmented_labels_path, 'r') as f:
             aug_labels = json.load(f)
+
+        if subset_only:
+            # keep only original images that exist in augmented_labels
+            labels = {k: v for k, v in labels.items() if k in aug_labels}
+
+        # Merge augmented labels
         labels.update(aug_labels)
 
     if save_path:
@@ -37,6 +43,7 @@ class CardDataset(Dataset):
 
         # Build a sorted list of unique class names (human-readable)
         self.class_names = sorted({v['name'] for v in self.data.values()})
+        self.classes = self.class_names   
 
         # Map class name → integer label
         self.class_to_idx = {cls_name: idx for idx, cls_name in enumerate(self.class_names)}
@@ -59,8 +66,12 @@ class CardDataset(Dataset):
         return len(self.filenames)
 
     def __getitem__(self, idx):
-        img_path = self.filenames[idx]
-        label = self.labels_dict[img_path]
+        fname = self.filenames[idx]
+        label = self.labels_dict[fname]
+
+        # Use full_path if available, fallback to fname
+        meta = self.data[fname]
+        img_path = meta.get("full_path", fname)
 
         image = Image.open(img_path).convert('RGB')
 
@@ -90,16 +101,26 @@ def get_train_val_loaders(dataset, batch_size=32, val_split=0.1, train_transform
 
     # For the training loader, if the dataset is imbalanced, use a weighted sampler (activable by argument).
     if use_weighted_sampler:
-        # Gather integer labels for training subset
-        train_labels = [train_dataset.dataset.labels_dict[f] for f in train_dataset.dataset.filenames]
+        # Get labels only for the subset
+        train_labels = [dataset.labels_dict[dataset.filenames[i]] for i in train_dataset.indices]
+
         label_counts = torch.bincount(torch.tensor(train_labels, dtype=torch.long))
         class_weights = 1.0 / label_counts.float()
         sample_weights = torch.tensor([class_weights[label] for label in train_labels], dtype=torch.float)
-        sampler = WeightedRandomSampler(weights=sample_weights, num_samples=len(sample_weights), replacement=True)
+
+        sampler = WeightedRandomSampler(
+            weights=sample_weights,
+            num_samples=len(sample_weights),
+            replacement=True
+        )
         train_loader = DataLoader(train_dataset, batch_size=batch_size, sampler=sampler)
     else:
         train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle)
 
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+    # Attach classes to loaders
+    train_loader.classes = dataset.class_names
+    val_loader.classes = dataset.class_names
 
     return train_loader, val_loader

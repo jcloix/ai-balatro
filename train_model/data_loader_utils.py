@@ -10,14 +10,15 @@ from config.config import LABELS_FILE, AUGMENTED_LABELS_FILE, MERGED_LABELS_FILE
 def load_dataloaders(
         batch_size, 
         val_split, 
-        use_augmented=False, 
+        no_augmented=False, 
         use_weighted_sampler=False,
         train_transform_mode="train",
-        val_transform_mode="test"
+        val_transform_mode="test",
+        subset_only=False
     ):
 
     # Merge labels once and save snapshot
-    merged_labels = load_merged_labels(LABELS_FILE, AUGMENTED_LABELS_FILE if use_augmented else None, MERGED_LABELS_FILE)
+    merged_labels = load_merged_labels(LABELS_FILE, None if no_augmented else AUGMENTED_LABELS_FILE, MERGED_LABELS_FILE, subset_only)
 
     # Create dataset (no internal transforms)
     dataset = CardDataset.from_labels_dict(merged_labels)

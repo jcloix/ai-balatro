@@ -32,13 +32,13 @@ pip install -r requirements.txt
 Run the module directly:
 
 ```bash
-python -m train_model
+python -m train_model.train
 ```
 
 Or with arguments (See CLI section)
 
 ```bash
-python -m train_model --epochs 20 --batch-size 32 --lr 0.0001 --val-split 0.2 --num-classes 50 --log-dir runs/card_training --freeze-backbone --use-augmented
+python -m train_model.train --epochs 20 --batch-size 32 --lr 0.0001 --val-split 0.2 --num-classes 50 --log-dir runs/card_training --freeze-backbone --use-augmented
 
 ```
 

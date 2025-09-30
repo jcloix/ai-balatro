@@ -24,7 +24,7 @@ def test_load_dataloaders_full(mock_get_loaders, mock_load_labels, mock_dataset)
     mock_get_loaders.return_value = (dummy_train_loader, dummy_val_loader)
     mock_load_labels.return_value = {"img1.png":{"name":"Joker"}}
 
-    train_loader, val_loader = data_loader_utils.load_dataloaders(batch_size=2, val_split=0.1, use_augmented=False)
+    train_loader, val_loader = data_loader_utils.load_dataloaders(batch_size=2, val_split=0.1, no_augmented=False)
     assert train_loader == dummy_train_loader
     assert val_loader == dummy_val_loader
     mock_get_loaders.assert_called_once_with(

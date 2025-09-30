@@ -40,6 +40,7 @@
 1. **Test on a small subset**
 2. **Implement the identify card**
 3. **Fine tune the model**
+4. **Add full path to images in JSON in annotate module**
 
 # 📝 Project Decisions - Balatro
 

@@ -22,12 +22,13 @@ def parse_args():
     parser.add_argument("--num-classes", type=int, default=None)
     parser.add_argument("--log-dir", type=str, default="logs")
     parser.add_argument("--checkpoint-interval", type=int, default=5)
-    parser.add_argument("--use-augmented", action="store_true")
+    parser.add_argument("--no-augmented", action="store_true")
     parser.add_argument("--freeze-backbone", action="store_true", help="Freeze feature extractor layers")
     parser.add_argument("--resume", type=str, default=None, help="Resume training from checkpoint")
     parser.add_argument("--use-weighted-sampler", action="store_true")
     parser.add_argument("--train-transform", type=str, default="train")
     parser.add_argument("--val-transform", type=str, default="test")
+    parser.add_argument("--subset-only", action="store_true", help="Use only original images that have augmentations")
 
     return parser.parse_args()
 
@@ -42,10 +43,11 @@ def main():
     train_loader, val_loader = load_dataloaders(
         batch_size=args.batch_size,
         val_split=args.val_split,
-        use_augmented=args.use_augmented,
+        no_augmented=args.no_augmented,
         use_weighted_sampler=args.use_weighted_sampler,
         train_transform_mode=args.train_transform,
-        val_transform_mode=args.val_transform
+        val_transform_mode=args.val_transform,
+        subset_only=args.subset_only
     )
 
     # Initialize all training objects in a single state
@@ -68,7 +70,7 @@ def main():
         epoch_metrics = Metrics.from_epoch(train_loss, val_metrics)
 
         # Log stats
-        log_epoch_stats(epoch, state.optimizer, epoch_metrics, state.writer, train_loader.dataset.classes)
+        log_epoch_stats(epoch, state.optimizer, epoch_metrics, state.writer, train_loader.classes)
 
         # Step scheduler (Adjusting the learning rate during training can help the model converge faster)
         if isinstance(state.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):

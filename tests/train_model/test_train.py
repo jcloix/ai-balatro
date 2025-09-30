@@ -43,7 +43,7 @@ def test_parse_args_overrides():
         assert args.val_split == 0.2
         assert args.log_dir == "my_logs"
         assert args.num_classes == 5
-        assert args.use_augmented is True
+        assert args.no_augmented is False
         assert args.use_weighted_sampler is True
 
 def test_parse_args_defaults_full():
@@ -59,7 +59,7 @@ def test_parse_args_defaults_full():
         "log_dir",
         "checkpoint_interval",
         "num_classes",
-        "use_augmented",
+        "no_augmented",
         "freeze_backbone",
         "resume",
         "use_weighted_sampler",
@@ -100,7 +100,7 @@ def test_main_loop(
     mock_parse_args.return_value = SimpleNamespace(
         batch_size=2,
         val_split=0.1,
-        use_augmented=False,
+        no_augmented=False,
         use_weighted_sampler=False,
         epochs=2,
         lr=0.01,
@@ -171,7 +171,7 @@ def test_main_loop_zero_epochs(
     mock_parse_args.return_value = SimpleNamespace(
         batch_size=2,
         val_split=0.1,
-        use_augmented=False,
+        no_augmented=False,
         use_weighted_sampler=False,
         epochs=0,
         lr=0.01,
@@ -223,7 +223,7 @@ def test_main_loop_early_stop_first_epoch(
     mock_parse_args.return_value = SimpleNamespace(
         batch_size=2,
         val_split=0.1,
-        use_augmented=False,
+        no_augmented=False,
         use_weighted_sampler=False,
         epochs=5,
         lr=0.01,
@@ -293,7 +293,7 @@ def test_main_loop_empty_dataset(
     mock_parse_args.return_value = SimpleNamespace(
         batch_size=2,
         val_split=0.1,
-        use_augmented=False,
+        no_augmented=False,
         use_weighted_sampler=False,
         epochs=2,
         lr=0.01,

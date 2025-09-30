@@ -37,6 +37,10 @@ pip-wheel-metadata/
 .streamlit/
 
 # ----------------------------
+# Tensorboard
+# ----------------------------
+runs/
+# ----------------------------
 # Project-specific
 # ----------------------------
 # Ignore large datasets and screenshots
