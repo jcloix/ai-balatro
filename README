@@ -169,7 +169,7 @@ if is_card_displayed("card_123"):
 
 4. **Merge labels**
 
-   * Combine original + augmented labels in memory.
+   * Combine original + augmented labels in memory (Done in the train_model module).
    * Result: `merged_labels.json` used for training.
 
 ---
@@ -178,7 +178,7 @@ if is_card_displayed("card_123"):
 
 1. Initialize `CardDataset`
 
-   * Loads image paths + labels from the merged JSON mapping in memory and save the merged JSON to disk.
+   * Loads image paths + labels from the merged JSON mapping in memory.
    * Provide the image paths that will be loaded and transformed on-the-fly when accessed by the DataLoader during training or validation.
    * Define the image transforms (augmentation, normalization, resizing) that will be applied later for training and validation.
 
@@ -186,8 +186,13 @@ if is_card_displayed("card_123"):
 
    * Split the dataset into training and validation subsets using `Config.VAL_SPLIT`.
    * Create DataLoaders for each subset:
+
      * Train loader → shuffled, batched.
      * Validation loader → not shuffled, batched.
+
+3. **Optional Weighted Sampler**
+
+   * If `use_weighted_sampler` is enabled, balance class distribution in the training loader.
 
 ---
 
@@ -213,11 +218,15 @@ model.fc = nn.Linear(num_features, NUM_CLASSES)
 
    * GPU if available (`cuda`), else CPU
 
-4. **Setup training parameters**
+4. **Freeze Backbone (optional)**
+
+   * If `freeze_backbone` is enabled, freeze all layers except the final fully connected layer.
+
+5. **Setup training parameters**
 
    * **Loss function:** `CrossEntropyLoss`
    * **Optimizer:** `Adam` with learning rate from config/arguments
-   * **Scheduler:** StepLR to adjust learning rate periodically
+   * **Scheduler:** StepLR or ReduceLROnPlateau depending on dataset size
    * **Mixed precision scaler:** `GradScaler` for faster GPU training (optional)
    * **Early stopping:** Monitors validation loss to stop training if no improvement
    * **TensorBoard writer:** Logs metrics for visualization
@@ -231,7 +240,7 @@ For each epoch:
 1. **Train one epoch**
 
    * Iterate through training loader batches.
-   * Move images + labels to device. (GPU or CPU)
+   * Move images + labels to device (GPU or CPU).
    * Forward pass → compute predictions.
    * Compute loss (`CrossEntropyLoss`).
    * Backward pass → compute gradients.
@@ -242,18 +251,17 @@ For each epoch:
 
    * Iterate through validation loader batches.
    * Forward pass only (no gradients).
-   * Compute validation loss.
+   * Compute validation loss and metrics (Top-K accuracy, confusion matrix).
    * Average validation loss.
 
 3. **Logging**
 
-   * Print epoch stats (train_loss, val_loss).
+   * Print epoch stats (train_loss, val_loss, metrics).
    * Optional: log to TensorBoard.
 
 4. **Learning rate scheduling**
 
-   * Adjusting the learning rate during training can help the model converge faster
-   * Step scheduler (optional).
+   * Adjust the learning rate during training (StepLR or ReduceLROnPlateau).
 
 5. **Checkpointing**
 
@@ -270,7 +278,7 @@ For each epoch:
 ### 5️⃣ End of Training
 
 1. Save final model (optional).
-2. Model ready for inference or embedding extraction.
+2. Model ready for inference, embedding extraction, or further fine-tuning.
 
 ---
 
