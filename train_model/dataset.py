@@ -1,5 +1,6 @@
 # train_model/dataset.py
-from torch.utils.data import Dataset, DataLoader, random_split
+import torch
+from torch.utils.data import Dataset, DataLoader, random_split, WeightedRandomSampler
 from PIL import Image
 import json
 import os
@@ -32,8 +33,18 @@ class CardDataset(Dataset):
     def __init__(self, labels_dict, transform=None):
         self.data = labels_dict
         self.filenames = list(self.data.keys())
-        self.labels_dict = {name: self.data[name]['label'] for name in self.filenames}
         self.transform = transform  # store transform
+
+        # Build a sorted list of unique class names (human-readable)
+        self.class_names = sorted({v['name'] for v in self.data.values()})
+
+        # Map class name → integer label
+        self.class_to_idx = {cls_name: idx for idx, cls_name in enumerate(self.class_names)}
+        self.idx_to_class = {idx: cls_name for cls_name, idx in self.class_to_idx.items()}
+
+        # Store integer labels for each file
+        self.labels_dict = {fname: self.class_to_idx[self.data[fname]['name']] for fname in self.filenames}
+
 
     @classmethod
     def from_labels_dict(cls, labels_dict):
@@ -55,21 +66,20 @@ class CardDataset(Dataset):
 
         if self.transform:  # apply transform if provided
             image = self.transform(image)
-            
+
         return image, label
 
 
 # -----------------------------
 # Helper: Train/Val Split Loader
 # -----------------------------
-def get_train_val_loaders(dataset, batch_size=32, val_split=0.1, train_transform=None, val_transform=None, shuffle=True):
+def get_train_val_loaders(dataset, batch_size=32, val_split=0.1, train_transform=None, val_transform=None, shuffle=True, use_weighted_sampler=False):
     """
     Split a dataset into train/validation loaders, optionally applying different transforms.
     """
     # Determine split sizes between train and val
     val_size = int(len(dataset) * val_split)
     train_size = len(dataset) - val_size
-
     train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
 
     # Apply different transforms for train/val
@@ -78,7 +88,18 @@ def get_train_val_loaders(dataset, batch_size=32, val_split=0.1, train_transform
     if val_transform:
         val_dataset.dataset.transform = val_transform
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle)
+    # For the training loader, if the dataset is imbalanced, use a weighted sampler (activable by argument).
+    if use_weighted_sampler:
+        # Gather integer labels for training subset
+        train_labels = [train_dataset.dataset.labels_dict[f] for f in train_dataset.dataset.filenames]
+        label_counts = torch.bincount(torch.tensor(train_labels, dtype=torch.long))
+        class_weights = 1.0 / label_counts.float()
+        sample_weights = torch.tensor([class_weights[label] for label in train_labels], dtype=torch.float)
+        sampler = WeightedRandomSampler(weights=sample_weights, num_samples=len(sample_weights), replacement=True)
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, sampler=sampler)
+    else:
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle)
+
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
     return train_loader, val_loader

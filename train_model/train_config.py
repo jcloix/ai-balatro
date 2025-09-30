@@ -47,5 +47,7 @@ class Config:
     TRANSFORMS = {
         "train": TransformConfig.TRAIN,
         "test": TransformConfig.TEST,
-        "none": TransformConfig.NONE
+        "none": TransformConfig.NONE,
+        "heavy": TransformConfig.TRAIN,  # can add more aggressive augmentations
+        "light": TransformConfig.TEST    # lighter augmentations
     }

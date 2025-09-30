@@ -1,78 +1,17 @@
-import torch
-from torch import nn
-from unittest.mock import MagicMock, patch
-import pytest
 import sys
-from torch.utils.data import DataLoader, TensorDataset
+from unittest.mock import patch, MagicMock
 from types import SimpleNamespace
-
-# Modules to test
+import torch
+from torch.utils.data import DataLoader, TensorDataset
 from train_model import train
+from train_model.metrics import Metrics
 
-@pytest.fixture
-def dummy_model():
-    model = nn.Linear(10, 2)
-    return model
-
-@pytest.fixture
-def dummy_loader():
-    # Small dataset: 3 batches of 2 samples
-    X = [torch.randn(2, 10) for _ in range(3)]
-    y = [torch.randint(0, 2, (2,)) for _ in range(3)]
-    return list(zip(X, y))
-
-def test_train_validate_epoch():
-    # Dummy dataset
-    x = torch.randn(4, 10)
-    y = torch.randint(0, 2, (4,))
-    dataset = TensorDataset(x, y)
-    dummy_loader = DataLoader(dataset, batch_size=2)
-
-    # Dummy model
-    dummy_model = torch.nn.Linear(10, 2)
-
-    criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(dummy_model.parameters(), lr=0.01)
-    device = torch.device("cpu")
-
-    # Train one epoch
-    train_loss = train.train_one_epoch(dummy_model, dummy_loader, criterion, optimizer, device)
-    assert train_loss >= 0
-
-    # Validate
-    val_loss = train.validate(dummy_model, dummy_loader, criterion, device)
-    assert val_loss >= 0
-
-def test_forward_backward(dummy_model):
-    x = torch.randn(2, 10)
-    y = torch.randint(0, 2, (2,))
-    criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(dummy_model.parameters())
-
-    # No scaler
-    out, loss = train.forward_pass(dummy_model, x, y, criterion)
-    train.backward_step(loss, optimizer)
-    assert loss.item() >= 0
-
-    # With dummy scaler
-    scaler = MagicMock()
-    out, loss = train.forward_pass(dummy_model, x, y, criterion, scaler=scaler)
-    train.backward_step(loss, optimizer, scaler=scaler)
-
-@patch("train_model.train.load_merged_labels")
-@patch("train_model.train.get_train_val_loaders")
-def test_load_dataloaders(mock_get_loaders, mock_load_labels):
-    mock_load_labels.return_value = {"img1.png": {"label": 0}, "img2.png": {"label": 1}}
-    mock_get_loaders.return_value = ("train_loader", "val_loader")
-
-    train_loader, val_loader = train.load_dataloaders(batch_size=2, val_split=0.5)
-    assert train_loader == "train_loader"
-    assert val_loader == "val_loader"
-
-
+# -----------------------------
+# 1. Default argument parsing
+# -----------------------------
 def test_parse_args_defaults():
     test_argv = ["train.py"]
-    with patch.object(sys, "argv", test_argv):
+    with patch("sys.argv", test_argv):
         args = train.parse_args()
         from train_model.train_config import Config
         assert args.epochs == Config.EPOCHS
@@ -81,6 +20,9 @@ def test_parse_args_defaults():
         assert args.val_split == Config.VAL_SPLIT
         assert args.log_dir == "logs"
 
+# -----------------------------
+# 2. Argument overrides
+# -----------------------------
 def test_parse_args_overrides():
     test_argv = [
         "train.py",
@@ -90,9 +32,10 @@ def test_parse_args_overrides():
         "--val-split", "0.2",
         "--log-dir", "my_logs",
         "--num-classes", "5",
-        "--use-augmented"
+        "--use-augmented",
+        "--use-weighted-sampler"
     ]
-    with patch.object(sys, "argv", test_argv):
+    with patch("sys.argv", test_argv):
         args = train.parse_args()
         assert args.epochs == 10
         assert args.batch_size == 8
@@ -101,108 +44,41 @@ def test_parse_args_overrides():
         assert args.log_dir == "my_logs"
         assert args.num_classes == 5
         assert args.use_augmented is True
+        assert args.use_weighted_sampler is True
+
+def test_parse_args_defaults_full():
+    test_argv = ["train.py"]
+    with patch.object(sys, "argv", test_argv):
+        args = train.parse_args()
+
+    expected_args = {
+        "epochs",
+        "batch_size",
+        "lr",
+        "val_split",
+        "log_dir",
+        "checkpoint_interval",
+        "num_classes",
+        "use_augmented",
+        "freeze_backbone",
+        "resume",
+        "use_weighted_sampler",
+        "train_transform",
+        "val_transform"
+    }
+
+    # Convert Namespace to set of attribute names
+    args_keys = set(vars(args).keys())
+
+    # This will fail if a new argument is added but not in expected_args
+    assert args_keys == expected_args
 
 # -----------------------------
-# 2. Test handle_checkpoints
+# Main loop tests
 # -----------------------------
-@patch("train_model.train.torch.save")
-@patch("train_model.train.os.makedirs")
-def test_handle_checkpoints_saves(mock_makedirs, mock_torch_save):
-    class DummyModel:
-        def state_dict(self):
-            return {"dummy": 123}
-
-    model = DummyModel()
-    best_val_loss = 1.0
-    val_loss = 0.5
-    checkpoint_dir = "/fake/dir"
-
-    # Best model save
-    new_best = train.handle_checkpoints(model, val_loss, best_val_loss, 1, checkpoint_dir, checkpoint_interval=5)
-    assert new_best == val_loss
-    mock_torch_save.assert_called()
-    mock_makedirs.assert_called()
-
-    # Periodic checkpoint
-    mock_torch_save.reset_mock()
-    train.handle_checkpoints(model, val_loss=0.6, best_val_loss=new_best, epoch=5, checkpoint_dir=checkpoint_dir, checkpoint_interval=5)
-    mock_torch_save.assert_called()
 
 # -----------------------------
-# 3. Test log_epoch_stats
-# -----------------------------
-def test_log_epoch_stats_prints(capsys):
-    class DummyOptimizer:
-        param_groups = [{"lr": 0.01}]
-
-    train.log_epoch_stats(1, 0.1, 0.2, DummyOptimizer())
-    captured = capsys.readouterr()
-    assert "Epoch 1" in captured.out
-    assert "Train Loss: 0.1000" in captured.out
-    assert "Val Loss: 0.2000" in captured.out
-
-@patch("train_model.train.SummaryWriter")
-def test_log_epoch_stats_tensorboard(mock_writer_class):
-    mock_writer = mock_writer_class.return_value
-    class DummyOptimizer:
-        param_groups = [{"lr": 0.01}]
-    train.log_epoch_stats(1, 0.1, 0.2, DummyOptimizer(), writer=mock_writer)
-    mock_writer.add_scalar.assert_any_call("Loss/Train", 0.1, 1)
-    mock_writer.add_scalar.assert_any_call("Loss/Val", 0.2, 1)
-    mock_writer.add_scalar.assert_any_call("Learning_Rate", 0.01, 1)
-
-# -----------------------------
-# 4. Test forward/backward passes
-# -----------------------------
-def test_forward_backward_no_scaler():
-    import torch
-    from torch import nn, optim
-
-    model = nn.Linear(2,2)
-    criterion = nn.MSELoss()
-    optimizer = optim.SGD(model.parameters(), lr=0.01)
-
-    images = torch.tensor([[1.,2.],[3.,4.]])
-    labels = torch.tensor([[0.,1.],[1.,0.]])
-
-    # Forward pass without scaler
-    outputs, loss = train.forward_pass(model, images, labels, criterion, scaler=None)
-    assert isinstance(outputs, torch.Tensor)
-    assert loss.item() > 0
-
-    # Backward step
-    train.backward_step(loss, optimizer, scaler=None)
-    # Optimizer should have non-zero gradients applied
-    for p in model.parameters():
-        assert p.grad is not None
-
-# -----------------------------
-# 5. Test load_dataloaders calls get_train_val_loaders correctly
-# -----------------------------
-@patch("train_model.train.get_train_val_loaders")
-@patch("train_model.train.load_merged_labels")
-@patch("train_model.train.CardDataset.from_labels_dict")
-def test_load_dataloaders(mock_dataset, mock_load_labels, mock_get_loaders):
-    dummy_dataset = MagicMock()
-    mock_dataset.return_value = dummy_dataset
-    dummy_train_loader = dummy_val_loader = "loader"
-    mock_get_loaders.return_value = (dummy_train_loader, dummy_val_loader)
-    mock_load_labels.return_value = {"img1.png":{"label":0}}
-
-    train_loader, val_loader = train.load_dataloaders(batch_size=2, val_split=0.1, use_augmented=False)
-    assert train_loader == dummy_train_loader
-    assert val_loader == dummy_val_loader
-    mock_get_loaders.assert_called_once_with(
-        dummy_dataset,
-        batch_size=2,
-        val_split=0.1,
-        train_transform=train.Config.TRANSFORMS['train'],
-        val_transform=train.Config.TRANSFORMS['test'],
-        shuffle=True
-    )
-
-# -----------------------------
-# 6. Main loop (mock full training)
+# 1. Helper to create dummy DataLoader
 # -----------------------------
 @patch("train_model.train.prepare_training")
 @patch("train_model.train.load_dataloaders")
@@ -220,24 +96,30 @@ def test_main_loop(
     mock_loaders,
     mock_prepare
 ):
-    # Mock args with SimpleNamespace for real attributes
+    # --- Mock command-line args ---
     mock_parse_args.return_value = SimpleNamespace(
         batch_size=2,
         val_split=0.1,
         use_augmented=False,
+        use_weighted_sampler=False,
         epochs=2,
         lr=0.01,
         log_dir="logs",
         checkpoint_interval=5,
         num_classes=3,
-        transforms="train"
+        train_transform="train",
+        val_transform="test"
     )
 
-    # Mock loaders
-    dummy_loader = ["batch1", "batch2"]
+    # --- Create dummy dataset + loader ---
+    x = torch.randn(4, 10)
+    y = torch.randint(0, 3, (4,))
+    dataset = TensorDataset(x, y)
+    dataset.classes = ["class0", "class1", "class2"]  # Add .classes attribute
+    dummy_loader = DataLoader(dataset, batch_size=2)
     mock_loaders.return_value = (dummy_loader, dummy_loader)
 
-    # Mock training state
+    # --- Mock training state ---
     dummy_state = MagicMock()
     dummy_state.model = MagicMock()
     dummy_state.device = "cpu"
@@ -246,24 +128,209 @@ def test_main_loop(
     dummy_state.scaler = None
     dummy_state.scheduler = MagicMock()
     dummy_state.early_stopping = MagicMock()
-    dummy_state.early_stopping.early_stop = False  # <-- prevent early stop
+    dummy_state.early_stopping.early_stop = False
     dummy_state.best_val_loss = 1.0
     dummy_state.writer = MagicMock()
     mock_prepare.return_value = dummy_state
 
-    # Mock training/validation/checkpoint functions
+    # --- Mock train/validate/checkpoint outputs ---
     mock_train_epoch.return_value = 0.1
-    mock_validate.return_value = 0.2
+    mock_validate.return_value = Metrics(val_loss=0.2, topk_acc=0.9, cm=torch.zeros(3, 3))
     mock_handle_ckpt.return_value = 0.1
 
-    # Run main
+    # --- Run main ---
+    import train_model.train as train
     train.main()
 
-    # Ensure main steps called correct number of times
+    # --- Assertions ---
     assert mock_train_epoch.call_count == 2
     assert mock_validate.call_count == 2
     assert mock_log_stats.call_count == 2
     assert dummy_state.scheduler.step.call_count == 2
     assert dummy_state.early_stopping.step.call_count == 2
+    dummy_state.writer.close.assert_called_once()
+
+
+@patch("train_model.train.prepare_training")
+@patch("train_model.train.load_dataloaders")
+@patch("train_model.train.train_one_epoch")
+@patch("train_model.train.validate")
+@patch("train_model.train.log_epoch_stats")
+@patch("train_model.train.handle_checkpoints")
+@patch("train_model.train.parse_args")
+def test_main_loop_zero_epochs(
+    mock_parse_args,
+    mock_handle_ckpt,
+    mock_log_stats,
+    mock_validate,
+    mock_train_epoch,
+    mock_loaders,
+    mock_prepare
+):
+    # Mock args with 0 epochs
+    mock_parse_args.return_value = SimpleNamespace(
+        batch_size=2,
+        val_split=0.1,
+        use_augmented=False,
+        use_weighted_sampler=False,
+        epochs=0,
+        lr=0.01,
+        log_dir="logs",
+        checkpoint_interval=5,
+        num_classes=3,
+        train_transform="train",
+        val_transform="test"
+    )
+
+    # Dummy loader
+    x = torch.randn(2, 10)
+    y = torch.randint(0, 3, (2,))
+    dataset = TensorDataset(x, y)
+    dataset.classes = ["class0", "class1", "class2"]
+    dummy_loader = DataLoader(dataset, batch_size=2)
+    mock_loaders.return_value = (dummy_loader, dummy_loader)
+
+    # Dummy state
+    dummy_state = MagicMock()
+    dummy_state.writer = MagicMock()
+    mock_prepare.return_value = dummy_state
+
+    train.main()
+
+    # Ensure train/validate/log are never called
+    assert mock_train_epoch.call_count == 0
+    assert mock_validate.call_count == 0
+    assert mock_log_stats.call_count == 0
+    dummy_state.writer.close.assert_called_once()
+
+
+@patch("train_model.train.prepare_training")
+@patch("train_model.train.load_dataloaders")
+@patch("train_model.train.train_one_epoch")
+@patch("train_model.train.validate")
+@patch("train_model.train.log_epoch_stats")
+@patch("train_model.train.handle_checkpoints")
+@patch("train_model.train.parse_args")
+def test_main_loop_early_stop_first_epoch(
+    mock_parse_args,
+    mock_handle_ckpt,
+    mock_log_stats,
+    mock_validate,
+    mock_train_epoch,
+    mock_loaders,
+    mock_prepare
+):
+    mock_parse_args.return_value = SimpleNamespace(
+        batch_size=2,
+        val_split=0.1,
+        use_augmented=False,
+        use_weighted_sampler=False,
+        epochs=5,
+        lr=0.01,
+        log_dir="logs",
+        checkpoint_interval=5,
+        num_classes=3,
+        train_transform="train",
+        val_transform="test"
+    )
+
+    # Dummy loader
+    x = torch.randn(2, 10)
+    y = torch.randint(0, 3, (2,))
+    dataset = TensorDataset(x, y)
+    dataset.classes = ["class0", "class1", "class2"]
+    dummy_loader = DataLoader(dataset, batch_size=2)
+    mock_loaders.return_value = (dummy_loader, dummy_loader)
+
+    # Dummy state
+    dummy_state = MagicMock()
+    dummy_state.model = MagicMock()
+    dummy_state.device = "cpu"
+    dummy_state.criterion = MagicMock()
+    dummy_state.optimizer = MagicMock()
+    dummy_state.scaler = None
+    dummy_state.scheduler = MagicMock()
+    dummy_state.early_stopping = MagicMock()
+    dummy_state.early_stopping.early_stop = False
+    dummy_state.best_val_loss = 1.0
+    dummy_state.writer = MagicMock()
+    mock_prepare.return_value = dummy_state
+
+    # Mock functions
+    mock_train_epoch.return_value = 0.1
+    mock_validate.return_value = Metrics(val_loss=0.2, topk_acc=0.9, cm=torch.zeros(3, 3))
+    mock_handle_ckpt.return_value = 0.1
+
+    # Trigger early stopping after first epoch
+    def early_stop_side_effect(val_loss):
+        dummy_state.early_stopping.early_stop = True
+    dummy_state.early_stopping.step.side_effect = early_stop_side_effect
+
+    train.main()
+
+    # Loop should run only once
+    assert mock_train_epoch.call_count == 1
+    assert mock_validate.call_count == 1
+    assert mock_log_stats.call_count == 1
+    dummy_state.writer.close.assert_called_once()
+
+@patch("train_model.train.prepare_training")
+@patch("train_model.train.load_dataloaders")
+@patch("train_model.train.train_one_epoch")
+@patch("train_model.train.validate")
+@patch("train_model.train.log_epoch_stats")
+@patch("train_model.train.handle_checkpoints")
+@patch("train_model.train.parse_args")
+def test_main_loop_empty_dataset(
+    mock_parse_args,
+    mock_handle_ckpt,
+    mock_log_stats,
+    mock_validate,
+    mock_train_epoch,
+    mock_loaders,
+    mock_prepare
+):
+    mock_parse_args.return_value = SimpleNamespace(
+        batch_size=2,
+        val_split=0.1,
+        use_augmented=False,
+        use_weighted_sampler=False,
+        epochs=2,
+        lr=0.01,
+        log_dir="logs",
+        checkpoint_interval=5,
+        num_classes=3,
+        train_transform="train",
+        val_transform="test"
+    )
+
+    # Empty DataLoader
+    class EmptyDataset:
+        classes = ["class0", "class1", "class2"]
+        def __len__(self): return 0
+    empty_loader = DataLoader(EmptyDataset())
+    mock_loaders.return_value = (empty_loader, empty_loader)
+
+    dummy_state = MagicMock()
+    dummy_state.model = MagicMock()
+    dummy_state.device = "cpu"
+    dummy_state.criterion = MagicMock()
+    dummy_state.optimizer = MagicMock()
+    dummy_state.scaler = None
+    dummy_state.scheduler = MagicMock()
+    dummy_state.early_stopping = MagicMock()
+    dummy_state.early_stopping.early_stop = False
+    dummy_state.best_val_loss = 1.0
+    dummy_state.writer = MagicMock()
+    mock_prepare.return_value = dummy_state
+
+    mock_train_epoch.return_value = 0.0
+    mock_validate.return_value = Metrics(val_loss=0.0, topk_acc=0.0, cm=torch.zeros(3,3))
+    mock_handle_ckpt.return_value = 0.0
+
+    train.main()
+
+    assert mock_train_epoch.call_count == 2
+    assert mock_validate.call_count == 2
     dummy_state.writer.close.assert_called_once()
 

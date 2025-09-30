@@ -2,7 +2,7 @@
 
 The `train_model` module is part of the **Balatro** project.  
 Its purpose is to **train an AI model to recognize cards** based on the annotated dataset.  
-The trained model can later be used for real-time card identification with `identify_card`.
+The trained model can later be used for real-time card identification with `identify_card` module.
 
 ---
 
@@ -35,6 +35,13 @@ Run the module directly:
 python -m train_model
 ```
 
+Or with arguments (See CLI section)
+
+```bash
+python -m train_model --epochs 20 --batch-size 32 --lr 0.0001 --val-split 0.2 --num-classes 50 --log-dir runs/card_training --freeze-backbone --use-augmented
+
+```
+
 ### Example workflow
 
 1. Prepare your dataset using:
@@ -52,11 +59,79 @@ python -m train_model
 
 ---
 
+## Detailed features
+
+## Balatro Train Module Features
+
+The `train` module provides full functionality to train, validate, and monitor the card recognition model. Its main capabilities include:
+
+### 1. Data Handling
+
+* **Merge Labels:** Combine original and augmented labels into a single mapping for training.
+* **Custom Dataset:** `CardDataset` loads images and labels from a dictionary or label files.
+* **Train/Validation Split:** Split datasets into train/val sets with optional transforms.
+* **Weighted Sampling:** Handle class imbalance with a `WeightedRandomSampler` if requested.
+* **Dynamic Augmentation:** Apply train-time image augmentations (configurable via `Config.TRANSFORMS['train']`) to improve generalization.
+
+### 2. Model Management
+
+* **Pretrained Model:** Load a pretrained ResNet18 and replace the final layer to match the dataset’s number of classes.
+* **Device Management:** Automatically uses GPU if available.
+* **Freezing Backbone:** Optionally freeze feature extractor layers for fine-tuning only the classifier.
+
+### 3. Training Pipeline
+
+* **Forward & Backward Pass:** Handles normal and mixed-precision training automatically.
+* **Validation:** Compute validation loss and optionally additional metrics during evaluation.
+
+### 4. Metrics
+
+* **Top-K Accuracy:** Compute Top-3 accuracy to measure how often the correct label is within the top-k predictions.
+* **Confusion Matrix:** Compute class-by-class performance for detailed error analysis.
+
+### 5. Logging & Visualization
+
+* **Console Logging:** Epoch statistics, including train/validation loss and optional metrics.
+* **TensorBoard Logging:** Tracks loss, learning rate, and Top-K accuracy. Write to 'runs/' by default.
+
+### 6. Checkpointing
+
+* **Best Model Saving:** Automatically saves the model with the lowest validation loss.
+* **Periodic Snapshots:** Saves checkpoints at regular intervals for safety.
+
+### 7. Training Utilities
+
+* **Early Stopping:** Monitors validation loss to stop training if performance stops improving.
+* **Learning Rate Scheduling:** Supports StepLR or ReduceLROnPlateau depending on dataset size.
+* **Resuming Training:** Load from a checkpoint to continue interrupted training.
+
+### 8. Configurable Parameters
+
+* **From `train_config.Config` :**
+
+  * `EPOCHS` : Default number of training epochs
+  * `BATCH_SIZE` : Default batch size
+  * `LEARNING_RATE` : Initial learning rate
+  * `VAL_SPLIT` : Default fraction of data for validation
+  * `NUM_CLASSES` : Number of output classes
+  * `TRANSFORMS` : Dictionary of image transformations (`train` / `test` / `none` / `heavy` / `light`) for dynamic augmentation
+
+
 ## ⚙️ Options
 
-- `--epochs <int>` → Number of training epochs (default: 10)  
-- `--batch-size <int>` → Batch size for training (default: 32)  
-- `--output <path>` → Path to save the trained model (default: `models/card_model.pth`)  
+* `--epochs` : Number of training epochs (default from `Config.EPOCHS`)
+* `--batch-size` : Batch size for training and validation (default `Config.BATCH_SIZE`)
+* `--lr` : Learning rate (default `Config.LEARNING_RATE`)
+* `--val-split` : Fraction of dataset used for validation (default `Config.VAL_SPLIT`)
+* `--num-classes` : Override number of output classes (default `Config.NUM_CLASSES`)
+* `--log-dir` : Directory for TensorBoard logs
+* `--checkpoint-interval` : Frequency (in epochs) to save periodic snapshots
+* `--use-augmented` : Enable augmented labels
+* `--freeze-backbone` : Freeze feature extractor layers
+* `--resume` : Path to a checkpoint to resume training
+* `--use-weighted-sampler` : Enable class-balanced sampling
+* `--train-transform` : Override default transform for training (Accept values from Config.TRANSFORMS)
+* `--val-transform` : Override default transform for validation (Accept values from Config.TRANSFORMS)
 
 ---
 
@@ -66,33 +141,6 @@ python -m train_model
 build_dataset  --->  annotate_dataset  --->  train_model  --->  identify_card
 ```
 
-## File structure and interactions
-
-train_model/
-├── train.py              # Main training loop
-│   ├─ parse_args()       # CLI arguments
-│   ├─ load_dataloaders() # Merge labels + create datasets + train/val loaders
-│   ├─ train_one_epoch()  # Training for one epoch
-│   ├─ validate()         # Compute validation loss
-│   ├─ log_epoch_stats()  # Console + TensorBoard logging
-│   ├─ handle_checkpoints() / save_checkpoint()  # Best/periodic model saving
-│   └─ main()             # Main loop: epochs, scheduler, early stopping
-│
-├── dataset.py            # Dataset utilities
-│   ├─ CardDataset        # Loads images and labels
-│   ├─ from_labels_dict() / from_label_paths()  # Constructors
-│   ├─ load_merged_labels()  # Merge original + augmented labels
-│   └─ get_train_val_loaders() # Split dataset + create DataLoaders
-│
-├── train_utils.py        # Training helper utilities
-│   ├─ TrainingState      # Encapsulates model, optimizer, scheduler, scaler, writer, early stopping
-│   ├─ EarlyStopping      # Tracks no-improvement epochs
-│   ├─ build_model()      # Pretrained ResNet18 + replace final layer + move to device
-│   └─ prepare_training() # Build model + optimizer + scheduler + scaler + early stopping + TensorBoard
-│
-└── train_config.py       # Configs
-    ├─ TransformConfig    # Predefined image transforms (train/test/none)
-    └─ Config             # Hyperparameters: epochs, batch_size, learning_rate, val_split, num_classes, transform mapping
 
 
 # Data Collection & Training Strategy Decisions – Balatro
@@ -258,14 +306,5 @@ This document outlines the decisions and trade-offs for building the dataset of 
 - Polychrome recognition is experimental and may require dataset extensions.  
 - Future versions may support transfer learning or custom model architectures.  
 
----
 
-## 🤝 Contributing
 
-Contributions for improving the training pipeline, model accuracy, or adding advanced features (e.g., augmentation, polychrome support) are welcome.  
-
----
-
-## 📄 License
-
-Specify your license here (MIT, GPL, etc.).

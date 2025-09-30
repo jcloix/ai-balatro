@@ -1,5 +1,5 @@
 # TO check versions:
-# pip freeze | Select-String "streamlit|Pillow|ImageHash|pyautogui|tqdm|matplotlib|torch|torchvision|tensorboard"
+# pip freeze | Select-String "streamlit|Pillow|ImageHash|pyautogui|tqdm|matplotlib|torch|torchvision|tensorboard|scikit-learn"
 # For image hashing and similarity checks
 ImageHash==4.3.2
 
@@ -24,3 +24,6 @@ torchvision==0.23.0
 
 # TensorBoard for training visualization
 tensorboard==2.20.0
+
+# Metrics and evaluation tools (used for computing confusion matrices and other stats)
+scikit-learn==1.7.2

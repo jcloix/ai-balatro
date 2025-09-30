@@ -1,0 +1,47 @@
+import torch
+import os
+from torch import nn, optim
+from torchvision import models
+from torch.utils.tensorboard import SummaryWriter
+from train_model.train_state import EarlyStopping, TrainingState
+
+def build_model(num_classes):
+    # Use a pre-trained ResNet18 (convolutional neural network) model and modify the final layer
+    model = models.resnet18(pretrained=True)
+    # Create a linear layer with the appropriate number of output classes for our dataset
+    # This replaces only the FC layer at the end of the model, so that we can leverage the pre-trained weights
+    num_features = model.fc.in_features
+    model.fc = nn.Linear(num_features, num_classes)
+    # Send model to device (GPU if available)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    return model.to(device), device
+
+def prepare_training(num_classes, log_dir, lr=1e-4, patience=5, freeze_backbone=False, resume_path=None, dataset_size=None):
+    # Build the model based on pretrained ResNet18 and replace final layer.
+    model, device = build_model(num_classes=num_classes)
+
+    # Optionally freeze backbone layers, useful for smaller datasets
+    if freeze_backbone:
+        for name, param in model.named_parameters():
+            if "fc" not in name:
+                param.requires_grad = False
+
+    # Setup optimizer, scheduler, loss function, scaler, early stopping, and TensorBoard writer
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=lr)
+    # Scheduler: StepLR for tiny dataset, ReduceLROnPlateau for medium dataset
+    if dataset_size is not None and dataset_size >= 100: # medium dataset
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3)
+    else:  # small dataset
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.5)
+    scaler = torch.amp.GradScaler(device="cuda") if torch.cuda.is_available() else None
+    early_stopping = EarlyStopping(patience=patience)
+    writer = SummaryWriter(log_dir=log_dir)
+
+    # Load checkpoint if resume_path provided
+    if resume_path and os.path.exists(resume_path):
+        checkpoint = torch.load(resume_path, map_location=device)
+        model.load_state_dict(checkpoint)
+        print(f"[INFO] Resumed training from {resume_path}")
+
+    return TrainingState(model, device, optimizer, scheduler, criterion, scaler, early_stopping, writer)

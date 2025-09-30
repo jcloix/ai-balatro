@@ -4,8 +4,8 @@
 - build_dataset: capture screenshots
 - annotate_dataset: labeling UI
 - augment_dataset: data augmentation 
-- train_model: AI training 
-- identify_card: real-time inference (planned)
+- train_model: AI training (on going)
+- identify_card: real-time inference 
 - utils: shared helpers
 - config: Global configuration
 
@@ -34,9 +34,12 @@
 - Screenshots folders is gitignored
 
 ## Next Steps / Ideas
-- Implement the identify card
-- Test on a small subset
-- Fine tune the model
+
+## Next Improvements / Roadmap
+
+1. **Test on a small subset**
+2. **Implement the identify card**
+3. **Fine tune the model**
 
 # 📝 Project Decisions - Balatro
 

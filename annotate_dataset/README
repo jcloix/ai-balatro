@@ -168,16 +168,3 @@ Don’t label all 175 unique cards at once:
 ---
 ✅ Recommendation: Combine **augmentation** + **embeddings with similarity search**.  
 This gives strong performance with minimal manual labeling effort.
-
-
----
-
-## 🤝 Contributing
-
-Feel free to contribute by improving the annotation UI, adding data export formats, or fixing bugs. Open issues or pull requests are welcome.
-
----
-
-## 📄 License
-
-Specify your license here (MIT, GPL, etc.).
