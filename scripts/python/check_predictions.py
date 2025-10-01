@@ -55,6 +55,7 @@ print("-" * 80)
 class_correct = {cls_name: 0 for cls_name in dataset.class_names}
 class_total = {cls_name: 0 for cls_name in dataset.class_names}
 
+not_correct = []
 with torch.no_grad():
     for idx, (images, labels) in enumerate(val_loader):
         images = images.to(DEVICE)
@@ -75,6 +76,8 @@ with torch.no_grad():
         class_total[gt_name] += 1
         if correct:
             class_correct[gt_name] += 1
+        else:
+            not_correct.append(f"{filename:40} | {gt_name:15} | {pred_name:15} | {correct}")
 
 # -----------------------------
 # Print per-class accuracy
@@ -87,3 +90,6 @@ for cls_name in dataset.class_names:
     correct = class_correct[cls_name]
     accuracy = 100.0 * correct / total if total > 0 else 0.0
     print(f"{cls_name:20} | {accuracy:9.2f}% | {total}")
+
+for s in not_correct:
+    print(s)

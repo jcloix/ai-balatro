@@ -39,13 +39,13 @@ pip install -r requirements.txt
 Run the augmentation script:
 
 ```bash
-python augment_dataset/main.py
+python -m augment_dataset.main
 ```
 
 Or with custom parameters:
 
 ```bash
-python augment_dataset/main.py --input data/test_subset --n 5 --seed 42
+python -m augment_dataset.main --input data/test_subset --n 5 --seed 42
 ```
 
 The script will:
@@ -58,7 +58,7 @@ The script will:
 ### 2️⃣ Verify the results
 
 ```bash
-python augment_dataset/visual_check.py
+python -m augment_dataset.visual_check
 ```
 
 ### 3️⃣ Generate the augmented labels JSON

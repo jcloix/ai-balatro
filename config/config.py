@@ -6,8 +6,8 @@
 DATA_DIR = "data"
 DATASET_DIR = f"{DATA_DIR}/unlabeled"               # raw screenshots
 DATASET_AUGMENTED_DIR = f"{DATA_DIR}/augmented"      # augmented images
-LABELS_FILE = f"{DATA_DIR}/labels.json"              # manual annotations
-AUGMENTED_LABELS_FILE = f"{DATA_DIR}/augmented.json" # metadata for augmented images
+LABELS_FILE = f"{DATASET_DIR}/labels.json"              # manual annotations
+AUGMENTED_LABELS_FILE = f"{DATASET_AUGMENTED_DIR}/augmented.json" # metadata for augmented images
 MERGED_LABELS_FILE = f"{DATA_DIR}/merged_labels.json" # optional merged JSON for training
 MODELS_DIR = f"{DATA_DIR}/models"                       # directory for saving models
 

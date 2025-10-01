@@ -38,8 +38,13 @@ python -m train_model.train
 Or with arguments (See CLI section)
 
 ```bash
-python -m train_model.train --epochs 20 --batch-size 32 --lr 0.0001 --val-split 0.2 --num-classes 50 --log-dir runs/card_training --freeze-backbone --use-augmented
+python -m train_model.train --epochs 20 --batch-size 32 --lr 0.0001 --val-split 0.2 --num-classes 170 --log-dir runs/card_training --freeze-backbone
 
+```
+
+Monitoring can be don with Tensorboard
+```bash
+tensorboard --logdir runs/card_training
 ```
 
 ### Example workflow
@@ -126,7 +131,7 @@ The `train` module provides full functionality to train, validate, and monitor t
 * `--num-classes` : Override number of output classes (default `Config.NUM_CLASSES`)
 * `--log-dir` : Directory for TensorBoard logs
 * `--checkpoint-interval` : Frequency (in epochs) to save periodic snapshots
-* `--use-augmented` : Enable augmented labels
+* `--no-augmented` : Skip offline augmentations
 * `--freeze-backbone` : Freeze feature extractor layers
 * `--resume` : Path to a checkpoint to resume training
 * `--use-weighted-sampler` : Enable class-balanced sampling

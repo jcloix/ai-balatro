@@ -1,15 +1,13 @@
 import argparse
-from augment import augment_dataset
+from augment_dataset.augment import augment_dataset
+from config.config import DATASET_DIR, DATASET_AUGMENTED_DIR
 
-# Default directories
-INPUT_DIR = "dataset/labeled"
-OUTPUT_DIR = "dataset/augmented"
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Augment labeled card images (instance-level)")
-    parser.add_argument("--input", type=str, default=INPUT_DIR, help="Input folder with labeled images")
-    parser.add_argument("--output", type=str, default=OUTPUT_DIR, help="Output folder for augmented images")
-    parser.add_argument("--n", type=int, default=5, help="Number of variations per image")
+    parser.add_argument("--input", type=str, default=DATASET_DIR, help="Input folder with labeled images")
+    parser.add_argument("--output", type=str, default=DATASET_AUGMENTED_DIR, help="Output folder for augmented images")
+    parser.add_argument("--n", type=int, default=20, help="Number of variations per image")
     parser.add_argument("--no-rotate", action="store_true", help="Disable rotation")
     parser.add_argument("--no-flip", action="store_true", help="Disable flipping")
     parser.add_argument("--no-bc", action="store_true", help="Disable brightness/contrast adjustment")

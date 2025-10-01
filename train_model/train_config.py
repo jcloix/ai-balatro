@@ -58,7 +58,7 @@ class Config:
     EPOCHS = 20
     BATCH_SIZE = 32
     LEARNING_RATE = 1e-4
-    VAL_SPLIT = 0.1
+    VAL_SPLIT = 0.2
 
     # Number of classes (can be overridden at runtime)
     NUM_CLASSES = 200

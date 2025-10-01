@@ -1,5 +1,4 @@
-import torch
-from torch.utils.data import DataLoader, WeightedRandomSampler
+#data_loader_utils.py
 from train_model.dataset import CardDataset, get_train_val_loaders, load_merged_labels
 from train_model.train_config import Config
 from config.config import LABELS_FILE, AUGMENTED_LABELS_FILE, MERGED_LABELS_FILE
@@ -33,3 +32,30 @@ def load_dataloaders(
         shuffle=True,
         use_weighted_sampler=use_weighted_sampler
     )
+
+
+def load_hybrid_dataloaders(batch_size, val_split, no_augmented=False):
+    # Load merged labels
+    merged_labels = load_merged_labels(LABELS_FILE, None if no_augmented else AUGMENTED_LABELS_FILE, MERGED_LABELS_FILE, subset_only)
+
+    # Base card loader (Augment → Split)
+    dataset_base = CardDataset.from_labels_dict(merged_labels)
+    train_loader_base, val_loader_base = get_train_val_loaders(
+        dataset_base,
+        batch_size=batch_size,
+        val_split=val_split,
+        train_transform=Config.TRANSFORMS["train"],
+        val_transform=Config.TRANSFORMS["test"]
+    )
+
+    # Modifier loader (Split → Augment) - only synthetic modifiers
+    dataset_modifier = CardDataset.from_labels_dict(merged_labels)
+    train_loader_modifier, val_loader_modifier = get_train_val_loaders(
+        dataset_modifier,
+        batch_size=batch_size,
+        val_split=val_split,
+        train_transform=Config.TRANSFORMS["heavy"],  # include Negative filter
+        val_transform=Config.TRANSFORMS["test"]
+    )
+
+    return train_loader_base, val_loader_base, train_loader_modifier, val_loader_modifier
