@@ -5,6 +5,7 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 from train_model import train
 from train_model.metrics import Metrics
+from train_model.train_config import Config
 
 # -----------------------------
 # 1. Default argument parsing
@@ -13,7 +14,6 @@ def test_parse_args_defaults():
     test_argv = ["train.py"]
     with patch("sys.argv", test_argv):
         args = train.parse_args()
-        from train_model.train_config import Config
         assert args.epochs == Config.EPOCHS
         assert args.batch_size == Config.BATCH_SIZE
         assert args.lr == Config.LEARNING_RATE
@@ -32,7 +32,7 @@ def test_parse_args_overrides():
         "--val-split", "0.2",
         "--log-dir", "my_logs",
         "--num-classes", "5",
-        "--use-augmented",
+        "--no-augmented",
         "--use-weighted-sampler"
     ]
     with patch("sys.argv", test_argv):
@@ -43,7 +43,7 @@ def test_parse_args_overrides():
         assert args.val_split == 0.2
         assert args.log_dir == "my_logs"
         assert args.num_classes == 5
-        assert args.no_augmented is False
+        assert args.no_augmented is True
         assert args.use_weighted_sampler is True
 
 def test_parse_args_defaults_full():
@@ -64,7 +64,8 @@ def test_parse_args_defaults_full():
         "resume",
         "use_weighted_sampler",
         "train_transform",
-        "val_transform"
+        "val_transform",
+        "subset_only"
     }
 
     # Convert Namespace to set of attribute names
@@ -108,7 +109,8 @@ def test_main_loop(
         checkpoint_interval=5,
         num_classes=3,
         train_transform="train",
-        val_transform="test"
+        val_transform="test",
+        subset_only=True
     )
 
     # --- Create dummy dataset + loader ---
@@ -117,6 +119,7 @@ def test_main_loop(
     dataset = TensorDataset(x, y)
     dataset.classes = ["class0", "class1", "class2"]  # Add .classes attribute
     dummy_loader = DataLoader(dataset, batch_size=2)
+    dummy_loader.classes = dataset.classes
     mock_loaders.return_value = (dummy_loader, dummy_loader)
 
     # --- Mock training state ---
@@ -139,7 +142,6 @@ def test_main_loop(
     mock_handle_ckpt.return_value = 0.1
 
     # --- Run main ---
-    import train_model.train as train
     train.main()
 
     # --- Assertions ---
@@ -179,7 +181,8 @@ def test_main_loop_zero_epochs(
         checkpoint_interval=5,
         num_classes=3,
         train_transform="train",
-        val_transform="test"
+        val_transform="test",
+        subset_only=False
     )
 
     # Dummy loader
@@ -188,6 +191,7 @@ def test_main_loop_zero_epochs(
     dataset = TensorDataset(x, y)
     dataset.classes = ["class0", "class1", "class2"]
     dummy_loader = DataLoader(dataset, batch_size=2)
+    dummy_loader.classes = dataset.classes
     mock_loaders.return_value = (dummy_loader, dummy_loader)
 
     # Dummy state
@@ -231,7 +235,8 @@ def test_main_loop_early_stop_first_epoch(
         checkpoint_interval=5,
         num_classes=3,
         train_transform="train",
-        val_transform="test"
+        val_transform="test",
+        subset_only=False
     )
 
     # Dummy loader
@@ -240,6 +245,7 @@ def test_main_loop_early_stop_first_epoch(
     dataset = TensorDataset(x, y)
     dataset.classes = ["class0", "class1", "class2"]
     dummy_loader = DataLoader(dataset, batch_size=2)
+    dummy_loader.classes = dataset.classes
     mock_loaders.return_value = (dummy_loader, dummy_loader)
 
     # Dummy state
@@ -301,7 +307,8 @@ def test_main_loop_empty_dataset(
         checkpoint_interval=5,
         num_classes=3,
         train_transform="train",
-        val_transform="test"
+        val_transform="test",
+        subset_only=False
     )
 
     # Empty DataLoader
@@ -309,6 +316,7 @@ def test_main_loop_empty_dataset(
         classes = ["class0", "class1", "class2"]
         def __len__(self): return 0
     empty_loader = DataLoader(EmptyDataset())
+    empty_loader.classes = ["class0", "class1", "class2"]
     mock_loaders.return_value = (empty_loader, empty_loader)
 
     dummy_state = MagicMock()

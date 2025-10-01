@@ -2,20 +2,10 @@
 import torch
 import os
 from torch import nn, optim
-from torchvision import models
+from models.models import build_model
 from torch.utils.tensorboard import SummaryWriter
 from train_model.train_state import EarlyStopping, TrainingState
 
-def build_model(num_classes):
-    # Use a pre-trained ResNet18 (convolutional neural network) model and modify the final layer
-    model = models.resnet18(pretrained=True)
-    # Create a linear layer with the appropriate number of output classes for our dataset
-    # This replaces only the FC layer at the end of the model, so that we can leverage the pre-trained weights
-    num_features = model.fc.in_features
-    model.fc = nn.Linear(num_features, num_classes)
-    # Send model to device (GPU if available)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    return model.to(device), device
 
 def prepare_training(num_classes, log_dir, lr=1e-4, patience=5, freeze_backbone=False, resume_path=None, dataset_size=None):
     # Build the model based on pretrained ResNet18 and replace final layer.

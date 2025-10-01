@@ -5,7 +5,7 @@ from train_model.data_loader_utils import load_dataloaders
 from config.config import MODELS_DIR
 import argparse
 from train_model.train_loops import train_one_epoch, validate
-from train_model.models import prepare_training
+from train_model.train_setup import prepare_training
 from train_model.logging import log_epoch_stats
 from train_model.model_saving import handle_checkpoints 
 from train_model.metrics import Metrics

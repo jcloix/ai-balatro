@@ -48,7 +48,7 @@ def test_load_merged_labels(temp_labels_files):
     orig_path, aug_path, save_path, _ = temp_labels_files
 
     # Merge original + augmented
-    merged = load_merged_labels(orig_path, aug_path, save_path)
+    merged = load_merged_labels(orig_path, aug_path, save_path, False)
     assert len(merged) == 3
     assert "img1.png" in merged and "img3.png" in merged
 
@@ -96,7 +96,7 @@ def test_card_dataset_from_labels_dict(dummy_images):
 def test_card_dataset_from_label_paths(temp_labels_files):
     orig_path, aug_path, save_path, _ = temp_labels_files
     dataset = CardDataset.from_label_paths(orig_path, aug_path, save_path)
-    assert len(dataset) == 3
+    assert len(dataset) == 1
 
     # class_names are strings
     for cls in dataset.class_names:

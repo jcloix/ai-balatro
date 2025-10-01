@@ -2,7 +2,7 @@ import torch
 from torchvision import transforms
 import json
 from train_model.dataset import CardDataset
-from train_model.models import prepare_training
+from train_model.train_setup import prepare_training
 from train_model.train_config import Config
 
 # -----------------------------

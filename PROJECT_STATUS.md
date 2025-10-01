@@ -37,11 +37,11 @@
 
 ## Next Improvements / Roadmap
 
-1. **Implement the identify card**
-2. **Fine tune the model**
-3. **Add full path to images in JSON in annotate module**
-4. **Add negative image augmentation**
-5. **Add multiple classes training**
+- **Add full path to images in JSON in annotate module**
+- **Make semi-automatic annotate cards**
+- **Implement the identify card**
+- **Fine tune the model**
+- **Add multiple classes training**
 
 
 ---

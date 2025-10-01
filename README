@@ -310,9 +310,9 @@ data/unlabeled/seen_hashes.json
 ### 2. **Annotations**
 
 ```
-data/labels.json
+data/cards/labels.json
 ```
-
+* Data are moved into data/cards
 * Human-provided labels for each raw image.
 * Maps original filenames → card identity (`name`, `type`, `rarity`, `modifier`, …).
 * Example:
@@ -336,7 +336,7 @@ data/labels.json
 
 ```
 data/augmented/*.png
-data/augmented.json
+data/augmented/augmented.json
 ```
 
 * `data/augmented/` contains only augmented images.
@@ -384,7 +384,7 @@ data/test_subset/*.png
 ### 🔑 Key Principles
 
 * **Raw stays raw** → `data/unlabeled` is immutable.
-* **Metadata centralized** → originals: `data/labels.json`, augmentations: `data/augmented.json`.
+* **Metadata centralized** → originals: `data/cards/labels.json`, augmentations: `data/augmented/augmented.json`.
 * **Training is reproducible** → merge the two JSONs in memory and feed both folders to your DataLoader.
 
 ---
