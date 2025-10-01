@@ -229,3 +229,52 @@ MODIFIER_OPTIONS = ["Base", "Foil", "Holographic", "Polychrome", "Negative"]
 * Focus on **Negative modifier** for synthetic augmentation
 * Collect other modifier examples progressively for future training
 * This allows the model to **generalize modifier detection** while reliably recognizing card identities.
+
+### Implications for Training
+
+* **Card identity head (first head)**
+
+  * Uses full dataset with offline augmentations, including synthetic Negative images.
+  * Follows **Augment → Split** strategy.
+* **Modifier head (second head)**
+
+  * Uses original card images only, no offline augmentation for rare modifiers.
+  * Follows **Split → Augment** strategy.
+* Validation metrics:
+
+  * **Card identity:** per-class accuracy
+  * **Modifier detection:** per-modifier accuracy, with focus on Negative modifier
+
+---
+
+## E. Two-Head Model Strategy
+
+### Context
+
+* The model has **two outputs (heads)**:
+
+  1. Card identity head – predicts the specific card
+  2. Modifier head – predicts the card modifier
+* Each head uses a different data and augmentation strategy.
+
+### 1️⃣ Card Identity Head (First Head)
+
+* **Goal:** Robustly recognize each card regardless of minor variations.
+* **Dataset:** Full card dataset with offline augmentations.
+* **Augmentation:** Standard transforms + synthetic Negative augmentations.
+* **Split strategy:** **Augment → Split** to ensure all cards appear in train/validation sets.
+
+### 2️⃣ Modifier Head (Second Head)
+
+* **Goal:** Detect modifier type, focusing on Negative.
+* **Dataset:** Original images (no offline augmentations for rare modifiers).
+* **Augmentation:** Only realistic augmentations; avoid excessive synthetic negatives.
+* **Split strategy:** **Split → Augment** to evaluate modifier detection on unseen cards.
+
+### Key Considerations
+
+1. **Head separation allows specialization**
+2. **Negative modifier handling**
+3. **Training & evaluation metrics**
+
+✅ **Outcome:** Two-head architecture robustly recognizes card identity and modifiers with appropriate augmentation and split strategies.

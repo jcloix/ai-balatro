@@ -37,7 +37,7 @@ def test_add_blur_noise():
 def test_augment_image_flags():
     img = create_test_image()
     # disable all to check image remains the same
-    augmented = augment.augment_image(img, rotate=False, flip=False, brightness_contrast=False, blur_noise=False)
+    augmented = augment.augment_image(img, rotate=False, flip=False, brightness_contrast=False, blur_noise=False, negative=False)
     assert augmented == img  # same object when all flags disabled
 
 def test_augment_dataset_creates_files():
@@ -50,3 +50,23 @@ def test_augment_dataset_creates_files():
         assert len(output_files) == 3
         for i in range(3):
             assert f"card1_aug{i}.png" in output_files
+
+def test_apply_negative():
+    img = create_test_image(color=(100, 150, 200, 255))
+    neg_img = augment.apply_negative(img)
+    assert isinstance(neg_img, Image.Image)
+    assert neg_img.size == img.size
+
+    # Check inversion on RGB channels (ignore alpha)
+    orig_pixels = img.load()
+    neg_pixels = neg_img.load()
+    for x in range(img.size[0]):
+        for y in range(img.size[1]):
+            r, g, b, a = orig_pixels[x, y]
+            r2, g2, b2, a2 = neg_pixels[x, y]
+            assert r2 == 255 - r
+            assert g2 == 255 - g
+            assert b2 == 255 - b
+            assert a2 == a  # alpha unchanged
+            break  # only check first pixel to speed up test
+        break
