@@ -12,6 +12,7 @@ def parse_args():
     parser.add_argument("--no-flip", action="store_true", help="Disable flipping")
     parser.add_argument("--no-bc", action="store_true", help="Disable brightness/contrast adjustment")
     parser.add_argument("--no-blur", action="store_true", help="Disable blur/noise addition")
+    parser.add_argument("--no-negative", action="store_true", help="Disable negative addition")
     parser.add_argument("--seed", type=int, default=None, help="Random seed for reproducibility")
     return parser.parse_args()
 
@@ -28,6 +29,7 @@ def main():
         flip=not args.no_flip,
         brightness_contrast=not args.no_bc,
         blur_noise=not args.no_blur,
+        negative=not args.no_negative,
         seed=args.seed
     )
 

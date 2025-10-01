@@ -4,7 +4,8 @@
 # Dataset paths
 # --------------------------
 DATA_DIR = "data"
-DATASET_DIR = f"{DATA_DIR}/unlabeled"               # raw screenshots
+SCREENSHOT_DIR = f"{DATA_DIR}/unlabeled"               # raw screenshots
+DATASET_DIR = f"{DATA_DIR}/cards"               # original picture to use as dataset
 DATASET_AUGMENTED_DIR = f"{DATA_DIR}/augmented"      # augmented images
 LABELS_FILE = f"{DATASET_DIR}/labels.json"              # manual annotations
 AUGMENTED_LABELS_FILE = f"{DATASET_AUGMENTED_DIR}/augmented.json" # metadata for augmented images

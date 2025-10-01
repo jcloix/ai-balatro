@@ -46,6 +46,7 @@ Or with custom parameters:
 
 ```bash
 python -m augment_dataset.main --input data/test_subset --n 5 --seed 42
+python -m augment_dataset.main --input data/test_negative --output data/augment_negative --n 2 --seed 42
 ```
 
 The script will:

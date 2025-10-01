@@ -1,6 +1,6 @@
 import os
 import random
-from PIL import Image, ImageEnhance, ImageFilter
+from PIL import Image, ImageEnhance, ImageFilter, ImageOps, ImageDraw
 from tqdm import tqdm
 
 def rotate_image(image: Image.Image, max_angle: int = 15):
@@ -37,7 +37,18 @@ def add_blur_noise(image: Image.Image, blur_prob=0.3, noise_prob=0.3):
                 pixels[x, y] = tuple(random.randint(0,255) for _ in range(3))
     return image
 
-def augment_image(image: Image.Image, rotate=True, flip=True, brightness_contrast=True, blur_noise=True):
+def apply_negative(image: Image.Image):
+    """Invert colors to simulate a negative filter"""
+    if image.mode == "RGBA":
+        r, g, b, a = image.split()
+        rgb_image = Image.merge("RGB", (r, g, b))
+        inverted = ImageOps.invert(rgb_image)
+        r2, g2, b2 = inverted.split()
+        return Image.merge("RGBA", (r2, g2, b2, a))
+    else:
+        return ImageOps.invert(image)
+
+def augment_image(image: Image.Image, rotate=True, flip=True, brightness_contrast=True, blur_noise=True, negative=True):
     if rotate:
         image = rotate_image(image)
     if flip:
@@ -46,10 +57,12 @@ def augment_image(image: Image.Image, rotate=True, flip=True, brightness_contras
         image = adjust_brightness_contrast(image)
     if blur_noise:
         image = add_blur_noise(image)
+    if negative:
+        image = apply_negative(image)
     return image
 
 def augment_dataset(input_dir: str, output_dir: str, n_variations: int = 5,
-                    rotate=True, flip=True, brightness_contrast=True, blur_noise=True, seed: int = None):
+                    rotate=True, flip=True, brightness_contrast=True, blur_noise=True, negative=True, seed: int = None):
     """
     Augment each image in input_dir with n_variations.
     Output images are named <original_name>_aug<N>.<ext> to preserve card identity.
@@ -71,6 +84,6 @@ def augment_dataset(input_dir: str, output_dir: str, n_variations: int = 5,
 
         name, ext = os.path.splitext(filename)
         for i in range(n_variations):
-            aug_img = augment_image(image, rotate, flip, brightness_contrast, blur_noise)
+            aug_img = augment_image(image, rotate, flip, brightness_contrast, blur_noise, negative)
             out_path = os.path.join(output_dir, f"{name}_aug{i}{ext}")
             aug_img.save(out_path)
