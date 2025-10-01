@@ -34,7 +34,7 @@ def load_dataloaders(
     )
 
 
-def load_hybrid_dataloaders(batch_size, val_split, no_augmented=False):
+def load_hybrid_dataloaders(batch_size, val_split, no_augmented=False, subset_only=False):
     # Load merged labels
     merged_labels = load_merged_labels(LABELS_FILE, None if no_augmented else AUGMENTED_LABELS_FILE, MERGED_LABELS_FILE, subset_only)
 
