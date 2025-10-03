@@ -1,26 +1,33 @@
-#models.py
+#train_setup.py
 import torch
-import os
-from torch import nn, optim
-from models.models import build_model
+from torch import optim
+from models.models import MultiHeadModel
 from torch.utils.tensorboard import SummaryWriter
 from train_model.train_state import EarlyStopping, TrainingState
+from train_model.persistence import apply_checkpoint
 
 
-def prepare_training(num_classes, log_dir, lr=1e-4, patience=5, freeze_backbone=False, resume_path=None, dataset_size=None):
-    # Build the model based on pretrained ResNet18 and replace final layer.
-    model, device = build_model(num_classes=num_classes)
+def build_model(heads):
+    # Build the model
+    head_configs = {head.name: head.num_classes for head in heads}
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = MultiHeadModel(head_configs=head_configs).to(device)
+    return model, device
+
+
+def prepare_training(heads, log_dir, lr=1e-4, patience=5, freeze_backbone=False, checkpoint=None):
+    # Build the model
+    model, device = build_model(heads)
 
     # Optionally freeze backbone layers, useful for smaller datasets
     if freeze_backbone:
-        for name, param in model.named_parameters():
-            if "fc" not in name:
-                param.requires_grad = False
+        for p in model.backbone.parameters():
+            p.requires_grad = False
 
     # Setup optimizer, scheduler, loss function, scaler, early stopping, and TensorBoard writer
-    criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=lr)
     # Scheduler: StepLR for tiny dataset, ReduceLROnPlateau for medium dataset
+    dataset_size = max(len(head.train_loader.dataset) for head in heads)
     if dataset_size is not None and dataset_size >= 100: # medium dataset
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3)
     else:  # small dataset
@@ -29,10 +36,8 @@ def prepare_training(num_classes, log_dir, lr=1e-4, patience=5, freeze_backbone=
     early_stopping = EarlyStopping(patience=patience)
     writer = SummaryWriter(log_dir=log_dir)
 
-    # Load checkpoint if resume_path provided
-    if resume_path and os.path.exists(resume_path):
-        checkpoint = torch.load(resume_path, map_location=device)
-        model.load_state_dict(checkpoint)
-        print(f"[INFO] Resumed training from {resume_path}")
-
-    return TrainingState(model, device, optimizer, scheduler, criterion, scaler, early_stopping, writer)
+    # Load checkpoint if one has been provided
+    start_epoch = 1
+    if checkpoint:
+        start_epoch = apply_checkpoint(checkpoint, model, optimizer, scheduler, scaler)
+    return TrainingState(model, device, optimizer, scheduler, scaler, early_stopping, writer, start_epoch)

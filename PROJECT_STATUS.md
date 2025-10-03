@@ -38,10 +38,10 @@
 ## Next Improvements / Roadmap
 
 - **Add full path to images in JSON in annotate module**
+- **Correct path to cards instead of unlabeled**
 - **Make semi-automatic annotate cards**
 - **Implement the identify card**
 - **Fine tune the model**
-- **Add multiple classes training**
 
 
 ---

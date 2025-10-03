@@ -59,6 +59,8 @@ class Config:
     BATCH_SIZE = 32
     LEARNING_RATE = 1e-4
     VAL_SPLIT = 0.2
+    PATIENCE = 5
+    CHECKPOINT_INTERVAL = 5
 
     # Number of classes (can be overridden at runtime)
     NUM_CLASSES = 200

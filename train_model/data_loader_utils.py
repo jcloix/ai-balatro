@@ -1,61 +1,113 @@
 #data_loader_utils.py
-from train_model.dataset import CardDataset, get_train_val_loaders, load_merged_labels
-from train_model.train_config import Config
-from config.config import LABELS_FILE, AUGMENTED_LABELS_FILE, MERGED_LABELS_FILE
+import torch
+from torch.utils.data import DataLoader, WeightedRandomSampler
+from collections import defaultdict
+import random
+import math
+# --------------------------
+#  Group filenames by key
+# --------------------------
+def group_by_card(labels_dict, key="name"):
+    grouped = defaultdict(list)
+    for fname, meta in labels_dict.items():
+        grouped[meta[key]].append(fname)
+    return grouped
 
-# -----------------------------
-# DataLoader Setup
-# -----------------------------
-def load_dataloaders(
-        batch_size, 
-        val_split, 
-        no_augmented=False, 
-        use_weighted_sampler=False,
-        train_transform_mode="train",
-        val_transform_mode="test",
-        subset_only=False
-    ):
+# --------------------------
+# Pick validation originals (always 1 per class)
+# --------------------------
+def pick_val_originals(orig_fnames, val_split=0.1):
+    """
+    Returns (train_files, val_files) by selecting a fraction of originals for validation.
+    
+    Note:
+        - If the number of originals is less than what val_split would select,
+          this function will always put at least 1 original in the validation set.
+        - val_split is applied fractionally, but never less than 1 original.
+    
+    Args:
+        orig_fnames (list): list of original filenames for a class
+        val_split (float): fraction of originals to assign to validation
+    
+    Returns:
+        train_files (list), val_files (list)
+    """
+    rng = random.Random()
+    orig_fnames = list(orig_fnames)  # copy
+    rng.shuffle(orig_fnames)
 
-    # Merge labels once and save snapshot
-    merged_labels = load_merged_labels(LABELS_FILE, None if no_augmented else AUGMENTED_LABELS_FILE, MERGED_LABELS_FILE, subset_only)
+    n_val = max(1, math.ceil(len(orig_fnames) * val_split))
+    val_files = orig_fnames[:n_val]
+    train_files = orig_fnames[n_val:]
+    return train_files, val_files
 
-    # Create dataset (no internal transforms)
-    dataset = CardDataset.from_labels_dict(merged_labels)
+# --------------------------
+# Assign augmentations (all to train)
+# --------------------------
+def assign_augmentations(aug_fnames, train_files):
+    train_files.extend(aug_fnames)
+    return train_files
 
-    # Get train/val loaders with appropriate transforms
-    return get_train_val_loaders(
-        dataset,
-        batch_size=batch_size,
-        val_split=val_split,
-        train_transform=Config.TRANSFORMS[train_transform_mode],
-        val_transform=Config.TRANSFORMS[val_transform_mode],
-        shuffle=True,
-        use_weighted_sampler=use_weighted_sampler
-    )
+# --------------------------
+# Build labels dict
+# --------------------------
+def build_labels_dict(files, original_labels, augmented_labels=None):
+    labels_dict = {}
+    for f in files:
+        if f in original_labels:
+            labels_dict[f] = original_labels[f]
+        elif augmented_labels and f in augmented_labels:
+            labels_dict[f] = augmented_labels[f]
+    return labels_dict
 
+# --------------------------
+# Main stratified split
+# --------------------------
+def stratified_split_with_aug(original_labels, augmented_labels=None, val_split=0.1, key="name"):
+    train_labels = {}
+    val_labels = {}
 
-def load_hybrid_dataloaders(batch_size, val_split, no_augmented=False, subset_only=False):
-    # Load merged labels
-    merged_labels = load_merged_labels(LABELS_FILE, None if no_augmented else AUGMENTED_LABELS_FILE, MERGED_LABELS_FILE, subset_only)
+    orig_by_name = group_by_card(original_labels, key)
+    aug_by_name  = group_by_card(augmented_labels, key) if augmented_labels else defaultdict(list)
 
-    # Base card loader (Augment → Split)
-    dataset_base = CardDataset.from_labels_dict(merged_labels)
-    train_loader_base, val_loader_base = get_train_val_loaders(
-        dataset_base,
-        batch_size=batch_size,
-        val_split=val_split,
-        train_transform=Config.TRANSFORMS["train"],
-        val_transform=Config.TRANSFORMS["test"]
-    )
+    for card_name in orig_by_name:
+        orig_fnames = orig_by_name[card_name]
+        aug_fnames = aug_by_name.get(card_name, [])
 
-    # Modifier loader (Split → Augment) - only synthetic modifiers
-    dataset_modifier = CardDataset.from_labels_dict(merged_labels)
-    train_loader_modifier, val_loader_modifier = get_train_val_loaders(
-        dataset_modifier,
-        batch_size=batch_size,
-        val_split=val_split,
-        train_transform=Config.TRANSFORMS["heavy"],  # include Negative filter
-        val_transform=Config.TRANSFORMS["test"]
-    )
+        # Step 2: pick 1 val original
+        train_files, val_files = pick_val_originals(orig_fnames, val_split)
 
-    return train_loader_base, val_loader_base, train_loader_modifier, val_loader_modifier
+        # Step 3: all augmentations → train
+        train_files = assign_augmentations(aug_fnames, train_files)
+
+        # Step 4: build dicts
+        train_labels.update(build_labels_dict(train_files, original_labels, augmented_labels))
+        val_labels.update(build_labels_dict(val_files, original_labels, augmented_labels))
+
+    return train_labels, val_labels
+
+# --------------------------
+# Create the train and validation data loaders
+# --------------------------
+def get_train_val_loaders(train_dataset, val_dataset, batch_size=32, use_weighted_sampler=False):
+    # Weighted sampler for training
+    if use_weighted_sampler:
+        train_labels_tensor = torch.tensor([train_dataset.labels_dict[fname] for fname in train_dataset.filenames], dtype=torch.long)
+        class_weights = 1.0 / torch.bincount(train_labels_tensor).float()
+        sample_weights = class_weights[train_labels_tensor].clone()
+        sampler = WeightedRandomSampler(
+            weights=sample_weights,
+            num_samples=len(sample_weights),
+            replacement=True
+        )
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, sampler=sampler)
+    else:
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+    # Attach classes
+    train_loader.classes = train_dataset.class_names
+    val_loader.classes = val_dataset.class_names
+
+    return train_loader, val_loader

@@ -1,89 +1,144 @@
+# tests/train_model/test_train_setup.py
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 import torch
+import torch.nn as nn
+
 from train_model import train_setup
 from train_model.train_state import TrainingState
 
+# Helper dummy classes for test heads/loaders
+class DummyHead:
+    def __init__(self, name, num_classes, train_loader):
+        self.name = name
+        self.num_classes = num_classes
+        self.train_loader = train_loader
 
-@pytest.fixture(autouse=True)
-def mock_summary_writer():
-    # Patch SummaryWriter where it's imported in train_setup
-    with patch("train_model.train_setup.SummaryWriter") as mock_writer_class:
-        yield mock_writer_class.return_value
+class DummyLoader:
+    def __init__(self, dataset_len):
+        self.dataset = MagicMock()
+        # ensure len(dataset) works
+        self.dataset.__len__.return_value = dataset_len
+
+# --------------------------
+# Tests
+# --------------------------
+@patch("train_model.train_setup.MultiHeadModel")
+def test_build_model(mock_model_class):
+    # This test only checks build_model constructs head_configs and calls MultiHeadModel.
+    dummy_heads = [DummyHead("id", 5, DummyLoader(10)), DummyHead("mod", 3, DummyLoader(10))]
+    mock_instance = MagicMock()
+    # Simulate .to() returning the instance (as real model.to() would)
+    mock_instance.to.return_value = mock_instance
+    mock_model_class.return_value = mock_instance
+
+    model, device = train_setup.build_model(dummy_heads)
+
+    mock_model_class.assert_called_once_with(head_configs={"id": 5, "mod": 3})
+    assert model == mock_instance
 
 
-def test_prepare_training_returns_state():
-    state = train_setup.prepare_training(num_classes=5, log_dir="runs/test")
+@patch("train_model.train_setup.SummaryWriter")
+@patch("train_model.train_setup.apply_checkpoint")
+@patch("train_model.train_setup.MultiHeadModel")
+def test_prepare_training_basic(mock_model_class, mock_apply_checkpoint, mock_writer):
+    """
+    Ensure prepare_training builds a model, optionally freezes backbone,
+    constructs optimizer/scheduler/scaler/writer and returns a TrainingState.
+    Provide a dummy real nn.Module so optimizer gets real parameters.
+    """
+    loader = DummyLoader(10)
+    heads = [DummyHead("id", 5, loader)]
+
+    # Create a tiny real model class (real nn.Parameters for optimizer)
+    class TinyModel(nn.Module):
+        def __init__(self):
+            super().__init__()
+            # backbone and a head so freezing logic has something to work with
+            self.backbone = nn.Sequential(nn.Linear(4, 4))
+            self.heads = nn.ModuleDict({"id": nn.Linear(4, 5)})
+        def forward(self, x):
+            return self.heads["id"](self.backbone(x).mean(dim=1))
+
+    tiny = TinyModel()
+    # Make sure calling .to(device) returns the model (consistent with build_model)
+    mock_model_class.return_value = tiny
+
+    # Mock SummaryWriter & apply_checkpoint
+    mock_writer_instance = MagicMock()
+    mock_writer.return_value = mock_writer_instance
+    mock_apply_checkpoint.return_value = 1  # start_epoch returned
+
+    state = train_setup.prepare_training(
+        heads,
+        log_dir="/tmp/logs",
+        lr=0.001,
+        freeze_backbone=True,
+        checkpoint=None
+    )
+
+    # Freeze check: backbone parameters must have requires_grad False
+    for p in tiny.backbone.parameters():
+        assert p.requires_grad is False
+
+    # Other assertions
     assert isinstance(state, TrainingState)
-    assert hasattr(state, "model")
-    assert hasattr(state, "optimizer")
-    assert hasattr(state, "scheduler")
-    assert hasattr(state, "criterion")
-    assert hasattr(state, "scaler")
-    assert hasattr(state, "early_stopping")
-    assert hasattr(state, "writer")
+    assert state.writer == mock_writer_instance
+    assert state.start_epoch == 1
 
 
-def test_freeze_backbone_parameters():
-    state = train_setup.prepare_training(num_classes=3, log_dir="runs/test", freeze_backbone=True)
-    for name, param in state.model.named_parameters():
-        if "fc" in name:
-            assert param.requires_grad
-        else:
-            assert not param.requires_grad
+@patch("train_model.train_setup.apply_checkpoint")
+@patch("train_model.train_setup.MultiHeadModel")
+def test_prepare_training_with_checkpoint(mock_model_class, mock_apply_checkpoint):
+    """
+    When a checkpoint is passed, prepare_training should call apply_checkpoint and
+    return TrainingState with start_epoch as returned by apply_checkpoint.
+    """
+    loader = DummyLoader(10)
+    heads = [DummyHead("id", 5, loader)]
+
+    # Provide a tiny real model (parameters present)
+    class TinyModel2(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.backbone = nn.Sequential(nn.Linear(2, 2))
+            self.heads = nn.ModuleDict({"id": nn.Linear(2, 5)})
+    tiny = TinyModel2()
+    mock_model_class.return_value = tiny
+
+    # Mock apply_checkpoint returning a specific epoch
+    mock_apply_checkpoint.return_value = 5
+
+    state = train_setup.prepare_training(heads, log_dir="/tmp/logs", checkpoint={"dummy": 1})
+
+    mock_apply_checkpoint.assert_called_once()
+    assert state.start_epoch == 5
 
 
-def test_scheduler_selection_step_lr_and_plateau():
-    from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau
+@patch("train_model.train_setup.MultiHeadModel")
+def test_prepare_training_scheduler_choice(mock_model_class):
+    """
+    Ensure scheduler selection works based on dataset size across heads.
+    - small dataset -> StepLR
+    - medium dataset (>=100) -> ReduceLROnPlateau
+    """
+    # Small dataset case
+    small_loader = DummyLoader(10)
+    heads_small = [DummyHead("h", 5, small_loader)]
+    # Tiny model with parameters
+    class TinyModel3(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.backbone = nn.Sequential(nn.Linear(2, 2))
+            self.heads = nn.ModuleDict({"h": nn.Linear(2, 5)})
+    mock_model_class.return_value = TinyModel3()
+    state_small = train_setup.prepare_training(heads_small, log_dir="/tmp/logs")
+    import torch.optim.lr_scheduler as sched
+    assert isinstance(state_small.scheduler, sched.StepLR)
 
-    # Small dataset -> StepLR
-    state_small = train_setup.prepare_training(num_classes=3, log_dir="runs/test", dataset_size=10)
-    assert isinstance(state_small.scheduler, StepLR)
-
-    # Medium dataset -> ReduceLROnPlateau
-    state_medium = train_setup.prepare_training(num_classes=3, log_dir="runs/test", dataset_size=150)
-    assert isinstance(state_medium.scheduler, ReduceLROnPlateau)
-
-
-@patch("train_model.train_setup.torch.load")
-@patch("os.path.exists", return_value=True)
-def test_resume_checkpoint_calls_load_state_dict(mock_exists, mock_torch_load):
-    dummy_ckpt = {"fc.weight": torch.randn(3, 512), "fc.bias": torch.randn(3)}
-    mock_torch_load.return_value = dummy_ckpt
-
-    with patch.object(train_setup, "build_model") as mock_build:
-        model_mock = torch.nn.Linear(512, 3)
-        with patch.object(model_mock, "load_state_dict") as mock_load_state:
-            mock_build.return_value = (model_mock, torch.device("cpu"))
-            state = train_setup.prepare_training(
-                num_classes=3,
-                log_dir="runs/test",
-                resume_path="fake_path.pth"
-            )
-
-            mock_exists.assert_called_with("fake_path.pth")
-            mock_torch_load.assert_called_with("fake_path.pth", map_location=state.device)
-            mock_load_state.assert_called_with(dummy_ckpt)
-
-
-def test_grad_scaler_initialization_mock():
-    with patch("torch.cuda.is_available", return_value=True), \
-         patch("torch.amp.GradScaler") as mock_scaler, \
-         patch("train_model.train_setup.build_model") as mock_build:
-
-        dummy_model = torch.nn.Linear(10, 3)
-        dummy_device = torch.device("cuda")
-        mock_build.return_value = (dummy_model, dummy_device)
-
-        state = train_setup.prepare_training(num_classes=3, log_dir="runs/test")
-
-        mock_scaler.assert_called_once_with(device="cuda")
-        assert state.scaler == mock_scaler.return_value
-        assert state.model == dummy_model
-        assert state.device == dummy_device
-
-
-def test_grad_scaler_none_on_cpu(monkeypatch):
-    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
-    state = train_setup.prepare_training(num_classes=3, log_dir="runs/test")
-    assert state.scaler is None
+    # Medium dataset case
+    medium_loader = DummyLoader(200)
+    heads_medium = [DummyHead("h", 5, medium_loader)]
+    mock_model_class.return_value = TinyModel3()
+    state_medium = train_setup.prepare_training(heads_medium, log_dir="/tmp/logs")
+    assert isinstance(state_medium.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau)

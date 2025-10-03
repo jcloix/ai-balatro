@@ -7,16 +7,16 @@ class TrainingState:
     """
     Container for model, device, optimizer, scheduler, criterion, scaler, and other training parameters.
     """
-    def __init__(self, model, device, optimizer, scheduler, criterion, scaler, early_stopping, writer):
+    def __init__(self, model, device, optimizer, scheduler, scaler, early_stopping, writer, start_epoch = 0):
         self.model = model
         self.device = device
         self.optimizer = optimizer
         self.scheduler = scheduler
-        self.criterion = criterion
         self.scaler = scaler
         self.early_stopping = early_stopping
         self.writer = writer
         self.best_val_loss = float('inf')
+        self.start_epoch = start_epoch
 
 # -----------------------------
 # Early Stopping
