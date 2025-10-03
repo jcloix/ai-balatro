@@ -57,7 +57,7 @@ def plot_confusion_matrix(cm, class_names=None):
     plt.xlabel("Predicted label")
     return figure
 
-def log_epoch_stats(epoch, optimizer, metrics, writer=None, class_names=None):
+def log_epoch_stats(epoch, optimizer, metrics, writer=None, class_names=None, task_name=None):
     lr = optimizer.param_groups[0]['lr']
 
     # Print main stats
@@ -66,7 +66,7 @@ def log_epoch_stats(epoch, optimizer, metrics, writer=None, class_names=None):
     # Optionally print metrics
     if metrics.topk_acc is not None:
         print(f"Top-3 Accuracy: {metrics.topk_acc *100:.2f}%")
-    log_confusion_matrix(metrics.cm,class_names)
+    log_confusion_matrix(metrics.cm, class_names)
 
     # Log to TensorBoard if writer is provided
     if writer:

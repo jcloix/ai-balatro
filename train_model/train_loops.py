@@ -1,24 +1,23 @@
 #train_loops.py
 import torch
-from train_model.metrics import top_k_accuracy, compute_confusion_matrix
-from train_model.metrics import Metrics
+import contextlib
+from train_model.metrics import top_k_accuracy, compute_confusion_matrix, Metrics
+from models.models import unwrap_model
 
 # -----------------------------
 # Training / Validation Steps
 # -----------------------------
 
-def forward_pass(model, images, labels, criterion, scaler=None):
+def forward_pass(model, images, labels, criterion, scaler=None, task_name=None):
     """
     Run forward pass and compute loss.
     Handles mixed precision if scaler is provided.
     Returns loss and model outputs.
+    Supports models that return a dict (e.g. with 'logits' or 'out').
     """
-    if scaler: # Mixed precision training (faster and less memory on GPU)
-        with torch.amp.autocast('cuda'): # Use mixed precision for this block
-            outputs = model(images)
-            loss = criterion(outputs, labels)
-    else:
-        outputs = model(images)
+    ctx = torch.amp.autocast("cuda") if scaler else contextlib.nullcontext()
+    with ctx:
+        outputs = unwrap_model(model, images, task_name)
         loss = criterion(outputs, labels)
     return outputs, loss
 
@@ -37,7 +36,7 @@ def backward_step(loss, optimizer, scaler=None):
         optimizer.step()
 
 
-def train_one_epoch(model, loader, criterion, optimizer, device, scaler=None):
+def train_one_epoch(model, loader, criterion, optimizer, device, scaler=None, task_name=None):
     # Set model to training mode
     model.train()
     # Calculate training loss
@@ -46,7 +45,7 @@ def train_one_epoch(model, loader, criterion, optimizer, device, scaler=None):
     for images, labels in loader:
         images, labels = images.to(device), labels.to(device)
         optimizer.zero_grad()  # Reset gradients
-        _, loss = forward_pass(model, images, labels, criterion, scaler)
+        _, loss = forward_pass(model, images, labels, criterion, scaler, task_name)
         backward_step(loss, optimizer, scaler)
         running_loss += loss.item() * images.size(0)
 
@@ -56,7 +55,7 @@ def train_one_epoch(model, loader, criterion, optimizer, device, scaler=None):
     return running_loss / dataset_size if dataset_size > 0 else 0.0
 
 
-def validate(model, loader, criterion, device, compute_metrics=False, num_classes=None):
+def validate(model, loader, criterion, device, compute_metrics=False, task_name=None, num_classes=None):
     # Set model to evaluation mode
     model.eval()
 
@@ -69,7 +68,7 @@ def validate(model, loader, criterion, device, compute_metrics=False, num_classe
     with torch.no_grad():  # Disable gradient computation for validation
         for images, labels in loader:
             images, labels = images.to(device), labels.to(device)
-            outputs, loss = forward_pass(model, images, labels, criterion)
+            outputs, loss = forward_pass(model, images, labels, criterion, scaler=None, task_name=task_name)
             val_loss += loss.item() * images.size(0)
 
             if compute_metrics:  # Compute metrics if requested
@@ -85,7 +84,7 @@ def validate(model, loader, criterion, device, compute_metrics=False, num_classe
         # Compute top-k counters - to calculate how many times the guess was in the top-k answers
         top3_acc = top_k_accuracy(all_outputs_tensor, all_labels_tensor, k=3)
         # Compute confusion matrix - Instead of average, give class-by-class performance view
-        cm = compute_confusion_matrix(model, loader, device, num_classes)
+        cm = compute_confusion_matrix(model, loader, device, num_classes, task_name)
 
     # For empty loader, keep metrics None
     dataset_size = len(loader.dataset) if hasattr(loader, "dataset") else 0

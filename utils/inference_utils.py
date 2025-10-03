@@ -1,63 +1,99 @@
-import argparse
+# train_model/inference_utils.py
 import torch
-from PIL import Image
 from torchvision import transforms
-from models.models import build_model  
-from config.config import BEST_MODEL_PATH, NB_CLASSES
+from PIL import Image
+from models.models import MultiHeadModel  # your MultiHeadModel class
+import argparse
+import json
 
-# same preprocessing as training
-TRANSFORM = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-])
+CHECKPOINT="data/models/best_model.pth"
 
-# cache model so it’s not reloaded every call
-_model = None
-_device = "cuda" if torch.cuda.is_available() else "cpu"
+# -----------------------------
+# Load trained model
+# -----------------------------
+def load_model(checkpoint_path, device=None):
+    device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+    checkpoint = torch.load(checkpoint_path, map_location=device)
 
-def _load_model():
-    global _model
-    if _model is None:
-        model, _ = build_model(num_classes=NB_CLASSES)
-        checkpoint = torch.load(BEST_MODEL_PATH, map_location=_device)
-        model.load_state_dict(checkpoint)
-        model.eval()
-        _model = model.to(_device)
-    return _model
+    # Build head_configs from the saved head states
+    head_configs = {}
+    class_names = {}
+    for task, head_state in checkpoint["head_states"].items():
+        class_names[task] = head_state["class_names"]
+        head_configs[task] = len(head_state["class_names"])
 
-def identify_card(img_path, topk=1):
-    """Run inference on a card and return predicted class (or top-K)."""
-    model = _load_model()
+    # Build model
+    model = MultiHeadModel(head_configs=head_configs, pretrained=False)
+    model.load_state_dict(checkpoint["model"])  # your persistence uses "model"
+    model.to(device)
+    model.eval()
 
-    img = Image.open(img_path).convert("RGB")
-    tensor = TRANSFORM(img).unsqueeze(0).to(_device)
+    return model, class_names
 
-    with torch.no_grad():
-        outputs = model(tensor)
-        probs = torch.softmax(outputs, dim=1)
-        top_probs, top_idxs = probs.topk(topk, dim=1)
+# -----------------------------
+# Preprocess image
+# -----------------------------
+def preprocess_image(image_path, size=(224, 224)):
+    img = Image.open(image_path).convert("RGB")
+    transform = transforms.Compose([
+        transforms.Resize(size),
+        transforms.ToTensor(),
+    ])
+    return transform(img).unsqueeze(0)
 
-    if topk == 1:
-        return top_idxs[0][0].item()
-    else:
-        return [(i.item(), p.item()) for i, p in zip(top_idxs[0], top_probs[0])]
-    
+# -----------------------------
+# Inference
+# -----------------------------
+@torch.no_grad()
+def infer(model, images, task_name=None, topk=1, device=None):
+    device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+    images = images.to(device)
+    outputs = model(images)
 
+    results = {}
+    tasks = [task_name] if task_name else outputs.keys()
+    for task in tasks:
+        logits = outputs[task]
+        probs = torch.softmax(logits, dim=1)
+        top_probs, top_idx = torch.topk(probs, k=topk, dim=1)
+        results[task] = {
+            "indices": top_idx[0].cpu().tolist(),
+            "probs": top_probs[0].cpu().tolist()
+        }
+    return results
+
+# -----------------------------
+# Map predicted indices to class names
+# -----------------------------
+def map_indices_to_labels(results, class_names):
+    mapped = {}
+    for task, data in results.items():
+        mapped[task] = [
+            class_names[task][i] for i in data["indices"]
+        ]
+    return mapped
+
+# -----------------------------
+# Main function
+# -----------------------------
 def main():
-    parser = argparse.ArgumentParser(description="Predict the card from an image")
-    parser.add_argument("img_path", type=str, help="Path to the card image")
-    parser.add_argument("--topk", type=int, default=1, help="Return top-K predictions")
+    parser = argparse.ArgumentParser(description="Run inference on a single image")
+    parser.add_argument("--img-path", type=str, required=True, help="Path to image")
+    parser.add_argument("--checkpoint", type=str, default=CHECKPOINT, help="Path to trained checkpoint")
+    parser.add_argument("--task-name", type=str, default=None, help="Optional: task to infer")
+    parser.add_argument("--topk", type=int, default=1, help="Return top-k predictions")
     args = parser.parse_args()
 
-    preds = identify_card(args.img_path, topk=args.topk)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model, class_names = load_model(args.checkpoint, device)
+    img_tensor = preprocess_image(args.img_path)
 
-    if args.topk == 1:
-        idx = preds
-        print(f"Predicted card: {idx} (index {idx})")
-    else:
-        print("Top-K predictions:")
-        for idx, prob in preds:
-            print(f"{idx}: {prob:.2f}")
+    results = infer(model, img_tensor, task_name=args.task_name, topk=args.topk, device=device)
+    mapped = map_indices_to_labels(results, class_names)
+
+    print(json.dumps({"raw": results, "labels": mapped}, indent=4))
+
 
 if __name__ == "__main__":
     main()
+# python -m utils.inference_utils --img-path "data/unlabeled/cluster1_card36_id178.png" --task-name identification

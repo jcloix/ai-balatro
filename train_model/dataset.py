@@ -27,8 +27,8 @@ class CardDataset(Dataset):
 
 
     @classmethod
-    def from_labels_dict(cls, labels_dict, field, transform):
-        return cls(labels_dict=labels_dict, field=field, transform=transform)
+    def from_labels_dict(cls, labels_dict, field, transform, class_names):
+        return cls(labels_dict=labels_dict, field=field, transform=transform, class_names=class_names)
     
     def __len__(self):
         return len(self.filenames)

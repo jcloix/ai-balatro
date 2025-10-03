@@ -41,6 +41,15 @@ def build_model(num_classes):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     return model.to(device), device
 
+def build_multi_model(head_configs):
+    """
+    Build a pretrained ResNet18 with MultiHeads and replace the final layer
+    with a linear layer of num_classes outputs.
+    """
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = MultiHeadModel(head_configs=head_configs).to(device)
+    return model, device
+
 
 def load_checkpoint(model, checkpoint_path, device=None):
     """
@@ -52,3 +61,16 @@ def load_checkpoint(model, checkpoint_path, device=None):
     model.load_state_dict(state_dict)
     model.eval()
     return model
+
+
+def unwrap_model(model, images, task_name=None):
+    """
+    Unwraps the model into outputs
+    In case of MultiHead, the ouputs are per head, 
+    Returns loss and model outputs.
+    Supports models that return a dict (e.g. with 'logits' or 'out').
+    """
+    outputs = model(images)
+    if task_name:
+        return outputs[task_name]
+    return outputs

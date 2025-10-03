@@ -38,7 +38,7 @@ python -m train_model.train
 Or with arguments (See CLI section)
 
 ```bash
-python -m train_model.train --epochs 20 --batch-size 32 --lr 0.0001 --val-split 0.2 --num-classes 170 --log-dir runs/card_training --freeze-backbone
+python -m train_model.train --tasks identification --epochs 30 --lr 0.0001 --log-dir runs/card_training --freeze-backbone
 
 ```
 

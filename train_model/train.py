@@ -59,17 +59,17 @@ def main():
         metrics = []
         for head in heads:
             # Train for one epoch
-            train_loss = train_one_epoch(state.model, head.train_loader, head.criterion, state.optimizer, state.device, state.scaler)
+            train_loss = train_one_epoch(state.model, head.train_loader, head.criterion, state.optimizer, state.device, state.scaler, head.name)
             
             # Validate
-            val_metrics = validate(state.model, head.val_loader, head.criterion, state.device, compute_metrics=True, num_classes=head.num_classes)
+            val_metrics = validate(state.model, head.val_loader, head.criterion, state.device, compute_metrics=True, task_name=head.name, num_classes=head.num_classes)
 
             # Agregate metrics
             epoch_metrics = Metrics.from_epoch(train_loss, val_metrics)
             metrics.append(epoch_metrics)
 
             # Log stats
-            log_epoch_stats(epoch, state.optimizer, epoch_metrics, state.writer, head.train_loader.classes)
+            log_epoch_stats(epoch, state.optimizer, epoch_metrics, state.writer, head.train_loader.classes, head.name)
         # Compute Loss on all heads (Average)
         epoch_val_loss = sum(metric.val_loss for metric in metrics) / len(metrics)
         # Step scheduler (Adjusting the learning rate during training can help the model converge faster)
@@ -84,6 +84,7 @@ def main():
             heads,
             epoch_val_loss,
             state.best_val_loss,
+            epoch,
             checkpoint_dir=MODELS_DIR,
             checkpoint_interval=args.checkpoint_interval,
         )

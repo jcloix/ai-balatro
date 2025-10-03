@@ -3,6 +3,7 @@ import torch
 import numpy as np
 from sklearn.metrics import confusion_matrix
 from dataclasses import dataclass
+from models.models import unwrap_model
 
 @dataclass
 class Metrics:
@@ -35,7 +36,7 @@ def top_k_accuracy(outputs, labels, k=3):
     correct = topk_preds.eq(labels.view(-1,1).expand_as(topk_preds)) # compare with true labels
     return correct.sum().item() / labels.size(0)
 
-def compute_confusion_matrix(model, loader, device, num_classes):
+def compute_confusion_matrix(model, loader, device, num_classes, task_name):
     """
     Compute the confusion matrix for a dataset.
     
@@ -49,7 +50,7 @@ def compute_confusion_matrix(model, loader, device, num_classes):
     with torch.no_grad():
         for images, labels in loader:
             images, labels = images.to(device), labels.to(device)
-            preds = torch.argmax(model(images), dim=1)  # predicted labels
+            preds = torch.argmax(unwrap_model(model,images,task_name), dim=1)  # predicted labels
             all_preds.extend(preds.cpu().numpy())
             all_labels.extend(labels.cpu().numpy())
 
