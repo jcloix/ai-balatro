@@ -64,7 +64,7 @@ def test_compute_confusion_matrix(tmp_path):
     device = torch.device("cpu")
     num_classes = 2
 
-    cm = metrics.compute_confusion_matrix(model, loader, device, num_classes)
+    cm = metrics.compute_confusion_matrix(model, loader, device, num_classes, task_name=None)
     assert isinstance(cm, np.ndarray)
     assert cm.shape == (num_classes, num_classes)
     # Should sum to number of samples

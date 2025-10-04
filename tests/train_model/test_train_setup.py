@@ -23,7 +23,7 @@ class DummyLoader:
 # --------------------------
 # Tests
 # --------------------------
-@patch("train_model.train_setup.MultiHeadModel")
+@patch("models.models.MultiHeadModel")
 def test_build_model(mock_model_class):
     # This test only checks build_model constructs head_configs and calls MultiHeadModel.
     dummy_heads = [DummyHead("id", 5, DummyLoader(10)), DummyHead("mod", 3, DummyLoader(10))]
@@ -40,7 +40,7 @@ def test_build_model(mock_model_class):
 
 @patch("train_model.train_setup.SummaryWriter")
 @patch("train_model.train_setup.apply_checkpoint")
-@patch("train_model.train_setup.MultiHeadModel")
+@patch("models.models.MultiHeadModel")
 def test_prepare_training_basic(mock_model_class, mock_apply_checkpoint, mock_writer):
     """
     Ensure prepare_training builds a model, optionally freezes backbone,
@@ -88,7 +88,7 @@ def test_prepare_training_basic(mock_model_class, mock_apply_checkpoint, mock_wr
 
 
 @patch("train_model.train_setup.apply_checkpoint")
-@patch("train_model.train_setup.MultiHeadModel")
+@patch("models.models.MultiHeadModel")
 def test_prepare_training_with_checkpoint(mock_model_class, mock_apply_checkpoint):
     """
     When a checkpoint is passed, prepare_training should call apply_checkpoint and
@@ -115,7 +115,7 @@ def test_prepare_training_with_checkpoint(mock_model_class, mock_apply_checkpoin
     assert state.start_epoch == 5
 
 
-@patch("train_model.train_setup.MultiHeadModel")
+@patch("models.models.MultiHeadModel")
 def test_prepare_training_scheduler_choice(mock_model_class):
     """
     Ensure scheduler selection works based on dataset size across heads.

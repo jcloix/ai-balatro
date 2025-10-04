@@ -1,7 +1,7 @@
 #train_setup.py
 import torch
 from torch import optim
-from models.models import MultiHeadModel, build_multi_model
+from models.models import build_multi_model
 from torch.utils.tensorboard import SummaryWriter
 from train_model.train_state import EarlyStopping, TrainingState
 from train_model.persistence import apply_checkpoint

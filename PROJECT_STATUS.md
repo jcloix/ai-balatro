@@ -61,220 +61,52 @@ flowchart TD
 ```
 
 ---
-# 📝 Project Decisions - Balatro
+## 📝 Design Decisions & Problems
 
-## A. How to Build the Dataset
+### Problems Encountered
 
-### Options:
+1. **Dataset Strategy**
 
-1. **Use game images directly**
-   **Advantages:**
+   * Mixing original and augmented data directly risked leaking augmented samples into validation.
+   * Needed flexible handling of augmentation (e.g., modifiers vs. identification).
 
-   * Easy to collect all cards
-     **Constraints:**
-   * Not realistic game scenario
-   * AI may learn visual aspects of the game interface rather than the card itself
+2. **Task Separation**
 
-2. **Take screenshots from the game’s collection**
-   **Advantages:**
+   * Initially considered training separate models for each task (identification, modifier).
+   * This was inefficient and duplicated effort.
 
-   * Easy to have each unique card
-     **Constraints:**
-   * Still not a real scenario
-   * Slight rotations or differences in card presentation can cause issues
+3. **Training State Persistence**
 
-3. **Take screenshots from real gameplay scenario**
-   **Advantages:**
+   * Deciding how to persist heads, class names, and optimizer/scheduler/scaler consistently.
+   * Avoiding missing keys when reloading for inference.
 
-   * More realistic training data
-   * Better learning experience for AI
-   * Provides natural variations in cards (rotation, lighting, perspective)
-     **Constraints:**
-   * Requires some automation to capture screenshots
-   * No guarantee to capture all unique cards in one session
+### Final Decisions
 
-**✅ Chosen Strategy:**
-Take screenshots from real gameplay (Option 3).
+* **Unified Model**
 
----
+  * One shared backbone model with multiple task-specific heads.
+  * Example heads:
 
-## B. Not Enough Images Per Unique Card
+    * *Identification* → Joker card identity.
+    * *Modifier* → Negative modifier (others later).
 
-### Options:
+* **Shared Training Components**
 
-1. **Few-shot / Transfer Learning**
+  * Optimizer, scheduler, and scaler are shared across all heads (since it’s one model).
+  * Each head maintains its own `class_names` and state for persistence.
 
-   * Use pretrained vision models (ResNet, EfficientNet, ViT)
-     **Advantages:** Easier setup
-     **Constraints:** May be less accurate when sample size is extremely low
+* **Dataset Handling**
 
-2. **Feature Extraction + Similarity Search**
+  * No strict "Split → Augment" pipeline.
+  * Each head may define its own dataset strategy (augmented or not).
+  * This allows modifier detection to use synthetic negatives, while identification may use broader augmentations.
 
-   * Train (or use pretrained) model to produce embeddings of card images
-   * Store embeddings of labeled reference cards
-   * For a new card, compute embedding and use cosine similarity or k-NN to find closest match
-     **Advantages:** Efficient identification of new cards, works well with very few samples per card
-     **Constraints:** Requires additional code to compute and compare embeddings
+* **Extensibility**
 
-3. **Augmentation-heavy Training**
-
-   * Generate multiple synthetic variations of each card (rotation, crop, color, noise, etc.)
-     **Advantages:** Quickly expands dataset without manual labeling, provides variety for training
-     **Constraints:** Variations are artificial; may not perfectly mimic real-world conditions
-
-4. **Progressive Approach**
-
-   * Start with a subset (e.g., 10 Jokers + 5 Tarots) and gradually expand pipeline
-     **Advantages:** Allows development and testing without waiting for full dataset
-     **Constraints:** Not production-ready; only suitable for iterative experimentation
-
-**✅ Chosen Strategy:**
-Combine **augmentation** + **embedding-based similarity search**.
+  * Adding a new task = add a new head + dataset strategy.
+  * Backbone and training loop stay the same.
+  * Makes the system modular and future-proof (holographic, foil, etc.).
 
 ---
 
-## C. Splitting Strategy (Train vs. Validation)
-
-### Context
-
-* Unlike standard classification tasks (“cat vs dog”), here each **class = identity of a unique card**.
-* Goal is not to generalize to new concepts but to **memorize and robustly recognize each specific card** under small variations (rotation, blur, lighting, etc.).
-* With modifiers, some augmentation strategies (e.g., Negative filter) need to be applied carefully so that the model sees all modifier types.
-
-### Options
-
-1. **Augment → Split**
-
-   * Apply offline augmentations to the full labeled dataset, then randomly split into train/validation.
-     **Advantages:**
-
-     * Ensures every card identity appears in both sets
-     * Validation checks robustness to augmentation noise (practical for deployment)
-       **Constraints:**
-     * Overestimates “generalization,” since validation sees the same card identities
-     * Not ideal for rare or synthetic modifiers
-
-2. **Split → Augment**
-
-   * Split original labeled images into train/validation **before** applying augmentation.
-     **Advantages:**
-
-     * Allows validation to evaluate performance on unseen augmentations
-     * Useful for modifier recognition tasks
-       **Constraints:**
-     * With very few samples per card, some classes may disappear entirely from train or validation
-     * Less useful for base card memorization
-
-3. **Hybrid Strategy**
-
-   * **Base card recognition:** Augment → Split (as before)
-   * **Modifier recognition:** Apply Split → Augment for synthetic modifiers
-     **Advantages:**
-
-     * Preserves base card memorization while allowing modifier detection
-       **Constraints:**
-     * Requires code to handle different splits/augmentations per task
-
-**✅ Chosen Strategy:**
-Use a **hybrid strategy**:
-
-* Base card identity: **Augment → Split**
-* Modifier detection (especially Negative filter): **Split → Augment**
-* Validation metrics should focus on **per-class accuracy** for base cards and per-modifier accuracy for modifiers.
-
----
-
-## D. Detecting Card Modifiers
-
-### Context
-
-* Each card can have a **modifier** affecting its appearance:
-
-```python
-MODIFIER_OPTIONS = ["Base", "Foil", "Holographic", "Polychrome", "Negative"]
-```
-
-* Modifiers are similar to filters or effects applied to the card.
-* Goal: the model should **recognize both the card identity and its modifier**.
-* Challenge: some modifiers (Foil, Holographic, Polychrome) are difficult to reproduce artificially, may be animated, and only snapshots are available.
-* The **Negative** modifier is easier to simulate (invert colors) and is of primary interest.
-
-### Options
-
-1. **Treat modifiers as separate classes**
-
-   * Example: “Joker_Base”, “Joker_Negative”, etc.
-     **Advantages:** Simple to implement in classification pipeline
-     **Constraints:** Number of classes grows combinatorially (card × modifier); rare modifiers may have too few samples
-
-2. **Multi-task learning**
-
-   * One head predicts **card identity**, another predicts **modifier type**
-     **Advantages:** Each head can focus on its specific task; modifier head can generalize across card identities
-     **Constraints:** Requires more complex model architecture; synthetic augmentations may still be needed for rare modifiers
-
-3. **Focus on easily-reproducible modifiers first**
-
-   * Prioritize **Negative** modifier detection
-   * Other modifiers collected progressively as real examples
-     **Advantages:** Guarantees meaningful modifier detection task
-     **Constraints:** Other modifiers remain “optional” until enough real data is collected
-
-**✅ Chosen Strategy:**
-
-* Use **multi-task model**:
-
-  * **Primary head:** card identity
-  * **Secondary head:** modifier detection
-* Focus on **Negative modifier** for synthetic augmentation
-* Collect other modifier examples progressively for future training
-* This allows the model to **generalize modifier detection** while reliably recognizing card identities.
-
-### Implications for Training
-
-* **Card identity head (first head)**
-
-  * Uses full dataset with offline augmentations, including synthetic Negative images.
-  * Follows **Augment → Split** strategy.
-* **Modifier head (second head)**
-
-  * Uses original card images only, no offline augmentation for rare modifiers.
-  * Follows **Split → Augment** strategy.
-* Validation metrics:
-
-  * **Card identity:** per-class accuracy
-  * **Modifier detection:** per-modifier accuracy, with focus on Negative modifier
-
----
-
-## E. Two-Head Model Strategy
-
-### Context
-
-* The model has **two outputs (heads)**:
-
-  1. Card identity head – predicts the specific card
-  2. Modifier head – predicts the card modifier
-* Each head uses a different data and augmentation strategy.
-
-### 1️⃣ Card Identity Head (First Head)
-
-* **Goal:** Robustly recognize each card regardless of minor variations.
-* **Dataset:** Full card dataset with offline augmentations.
-* **Augmentation:** Standard transforms + synthetic Negative augmentations.
-* **Split strategy:** **Augment → Split** to ensure all cards appear in train/validation sets.
-
-### 2️⃣ Modifier Head (Second Head)
-
-* **Goal:** Detect modifier type, focusing on Negative.
-* **Dataset:** Original images (no offline augmentations for rare modifiers).
-* **Augmentation:** Only realistic augmentations; avoid excessive synthetic negatives.
-* **Split strategy:** **Split → Augment** to evaluate modifier detection on unseen cards.
-
-### Key Considerations
-
-1. **Head separation allows specialization**
-2. **Negative modifier handling**
-3. **Training & evaluation metrics**
-
-✅ **Outcome:** Two-head architecture robustly recognizes card identity and modifiers with appropriate augmentation and split strategies.
+✅ This design avoids data leakage, reduces duplication, and supports multi-task learning in a clean, extensible way.

@@ -18,3 +18,16 @@ DEFAULT_INPUTS = {
     "select_tarot": "",
     "select_spectral": ""
 }
+
+INPUT_TO_FIELD_MAP = {
+    "card_name": "name",
+    "card_type": "type",
+    "card_rarity": "rarity",
+    "card_modifier": "modifier",
+}
+
+# --------------------------
+# Inference constants (use for semi-automatic annotate)
+# --------------------------
+
+TRESHOLD_TOP2 = 0.10

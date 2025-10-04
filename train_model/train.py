@@ -71,7 +71,7 @@ def main():
             # Log stats
             log_epoch_stats(epoch, state.optimizer, epoch_metrics, state.writer, head.train_loader.classes, head.name)
         # Compute Loss on all heads (Average)
-        epoch_val_loss = sum(metric.val_loss for metric in metrics) / len(metrics)
+        epoch_val_loss = max(metric.val_loss for metric in metrics)
         # Step scheduler (Adjusting the learning rate during training can help the model converge faster)
         if isinstance(state.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
             state.scheduler.step(epoch_val_loss)

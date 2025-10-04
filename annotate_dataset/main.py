@@ -7,9 +7,8 @@ from PIL import Image
 from config.config import DATASET_DIR, LABELS_FILE, CARD_TYPES, RARITY_OPTIONS, MODIFIER_OPTIONS
 from annotate_dataset.annotate_config import HELPER_KEYS
 from annotate_dataset.data_loader import load_labels, list_images, build_maps, get_unlabeled_groups, parse_ids, compute_unique_by_type
-from annotate_dataset.session_utils import init_session_state, clear_helpers, clear_fields
+from annotate_dataset.session_utils import init_session_state, init_session_state_inputs, clear_helpers, clear_fields
 from annotate_dataset.ui_components import display_card, render_sidebar, helper_selectboxes
-
 
 # --------------------------
 # Streamlit config
@@ -21,7 +20,13 @@ st.set_page_config(page_title="Card Labeler", layout="wide")
 # --------------------------
 labels = load_labels()
 all_images = list_images()
-card_group_map, cluster_map = build_maps(all_images)
+maps_obj  = build_maps(all_images)
+# Extract maps
+card_group_map = maps_obj.group_map
+cluster_map = maps_obj.cluster_map
+file_map = maps_obj.file_map
+prefill_map = getattr(maps_obj, "prefill_map", {})
+
 unlabeled_card_groups = get_unlabeled_groups(card_group_map, labels)
 unique_by_type = compute_unique_by_type(labels)
 total = len(all_images)
@@ -42,11 +47,12 @@ render_sidebar(total, labeled_count, unlabeled_count, unique_by_type)
 # Main app logic
 # --------------------------
 
-def inputs_form(labels,unique_by_type):
+def inputs_form(labels, unique_by_type, current_file=None):
     # Existing names
     existing_by_type = {t: sorted(unique_by_type[t]) for t in CARD_TYPES}
     # Input columns
     cols_inputs = st.columns([2, 1, 1, 1])
+
     with cols_inputs[0]:
         typed_name = st.text_input("Card Name", key="card_name")
         typed_name = typed_name.capitalize() if typed_name else typed_name
@@ -96,8 +102,8 @@ def inputs_form(labels,unique_by_type):
             disabled=(card_type != "Joker")
         )
 
-def display_main_card(current_file, current_group_id, cluster_id):
-    st.title(f"Label Card Group ID {current_group_id} (Cluster {cluster_id})")
+def display_main_card(current_file):
+    st.title(f"Label Card : {current_file}")
     st.subheader("Current Card")
     display_card(os.path.join(DATASET_DIR, current_file), width=200)
 
@@ -115,7 +121,7 @@ def group_section(group_files, labels):
                 "Include", key=f"group_{f}", value=st.session_state["group_section"][f]
             )
 
-def display_save_button(cluster_id, current_group_id, labels):
+def display_save_button(labels):
     if st.button("Save Labels for Current Group"):
         name_to_save = st.session_state["card_name"]
         type_to_save = st.session_state["card_type"]
@@ -129,9 +135,7 @@ def display_save_button(cluster_id, current_group_id, labels):
                         "name": name_to_save,
                         "type": type_to_save,
                         "rarity": rarity_to_save,
-                        "modifier": modifier_to_save,
-                        "cluster": cluster_id,
-                        "card_group": current_group_id
+                        "modifier": modifier_to_save
                     }
         with open(LABELS_FILE, "w") as fw:
             json.dump(labels, fw, indent=2)
@@ -139,14 +143,14 @@ def display_save_button(cluster_id, current_group_id, labels):
         st.session_state["group_idx"] += 1
         st.session_state["group_section"] = {}
         st.session_state["cluster_section"] = {}
-        clear_fields()
+        clear_fields() 
 
         st.success(f"Labeled {name_to_save} ✅")
         st.rerun()
 
 def cluster_section(cluster_id, group_files, labels):
     if not st.session_state["cluster_section"]:
-        cluster_files = [f for f in cluster_map[cluster_id] if f not in group_files and f not in labels]
+        cluster_files = [f for f in cluster_map.get(cluster_id, []) if f not in group_files and f not in labels]
         st.session_state["cluster_section"] = {f: False for f in cluster_files}
     st.subheader("Cards of same cluster (not labeled together)")
     num_cols_cluster = 14
@@ -170,10 +174,12 @@ def display_body():
 
     # Pick first unlabeled card
     current_file = next(f for f in group_files if f not in labels)
-    cluster_id, _ = parse_ids(current_file)
+
+    # Prefill the values of the inputs
+    init_session_state_inputs(current_file,prefill_map)
 
     # Display main card
-    display_main_card(current_file, current_group_id, cluster_id)
+    display_main_card(current_file)
     
     # Inputs form
     inputs_form(labels, unique_by_type)
@@ -185,11 +191,12 @@ def display_body():
     # --------------------------
     # Save button
     # --------------------------
-    display_save_button(cluster_id, current_group_id, labels)
+    display_save_button(labels)
 
     # --------------------------
     # Cards of same cluster
     # --------------------------
+    cluster_id = file_map[current_file]["cluster_id"]
     cluster_section(cluster_id, group_files, labels)
 
 display_body()
