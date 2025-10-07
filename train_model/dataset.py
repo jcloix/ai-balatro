@@ -21,6 +21,7 @@ class CardDataset(Dataset):
         # Map class name → integer label
         self.class_to_idx = {cls_name: idx for idx, cls_name in enumerate(self.class_names)}
         self.idx_to_class = {idx: cls_name for cls_name, idx in self.class_to_idx.items()}
+        print(self.class_to_idx)
 
         # Store integer labels for each file
         self.labels_dict = {fname: self.class_to_idx[self.data[fname][field]] for fname in self.filenames}

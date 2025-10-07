@@ -36,3 +36,12 @@ RARITY_OPTIONS = ["Common", "Uncommon", "Rare"]
 # Modifier options
 # --------------------------
 MODIFIER_OPTIONS = ["Base", "Foil", "Holographic", "Polychrome", "Negative"]
+
+# --------------------------
+# Map field to list
+# --------------------------
+FIELD_LIST_MAP = {
+    "type":CARD_TYPES,
+    "rarity":RARITY_OPTIONS,
+    "modifier":MODIFIER_OPTIONS,
+}

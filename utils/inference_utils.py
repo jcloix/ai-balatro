@@ -9,9 +9,10 @@ import os
 import glob
 
 # Example Command
-# python -m utils.inference_utils --img-dir "data/dataset_default" --task-name identification --topk 3 --out-json "data/dataset_default/inference.json"
+# python -m utils.inference_utils --img-dir "data/dataset_default" --task-name identification --topk 2 --out-json "data/dataset_default/inference2.json"
+# python -m utils.inference_utils --img-path "data/dataset_default/cluster1_card36_id610.png" --topk 3 
 
-CHECKPOINT="data/models/best_model.pth"
+CHECKPOINT="data/models/identity_card.pth"
 
 # -----------------------------
 # Load trained model

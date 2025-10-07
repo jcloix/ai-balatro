@@ -8,6 +8,7 @@ from config.config import LABELS_FILE, AUGMENTED_LABELS_FILE
 from train_model.data_loader_utils import stratified_split_with_aug, get_train_val_loaders
 from train_model.dataset import CardDataset
 from torch import nn
+import torch
 
 class ClassificationHead(ABC):
     DEFAULTS = {
@@ -38,7 +39,9 @@ class ClassificationHead(ABC):
         self.augmented_labels_file = cfg["augmented_labels_file"]
         self.field = cfg["field"]
         self.num_classes=0
-        self.criterion = self.build_criterion()
+    
+    def init_criterion(self, model, device):
+        self.criterion = self.build_criterion(model, device)
 
     def load_dataloaders(self, checkpoint):
         """
@@ -81,29 +84,40 @@ class ClassificationHead(ABC):
         return train_dataset, val_dataset
     
     def get_dataloaders(self, train_dataset, val_dataset, batch_size, use_weighted_sampler):
+        """
+        from torch.utils.data import WeightedRandomSampler
+
+class_weights = [1.0 / freq[c] for c in class_indices]
+sampler = WeightedRandomSampler(class_weights, num_samples=len(dataset), replacement=True)
+        """
         return get_train_val_loaders(train_dataset, val_dataset, batch_size, use_weighted_sampler)
     
-    def build_criterion(self):
+    def build_criterion(self, model, device):
         return nn.CrossEntropyLoss()
 
 
 @register_head("identification")
 class IdentificationHead(ClassificationHead):
     DEFAULTS = {
+        "val_split":0.15,
         "train_transform":"heavy",
         "val_transform":"test",
         "labels_file":LABELS_FILE,
-        "augmented_labels_file":AUGMENTED_LABELS_FILE
+        "augmented_labels_file":"data/augmented_identity/augmented.json"
     }
 
 
 @register_head("modifier")
 class ModifierHead(ClassificationHead):
     DEFAULTS = {
-        "val_split":0.1,
+        "val_split":0.25,
         "train_transform":"light",
         "val_transform":"test",
         "labels_file":LABELS_FILE,
-        "augmented_labels_file":"data/modifier_augmented/augmented.json",
+        "augmented_labels_file":"data/augmented_modifier/augmented.json",
         "field":"modifier"
     }
+
+    def build_criterion(self, model, device):
+        weights = torch.tensor([1.0, 1.0, 1.0, 3.0, 1.0]).to(device)
+        return nn.CrossEntropyLoss(weight=weights)

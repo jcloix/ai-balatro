@@ -1,6 +1,6 @@
 # card_dataset/config.py
 import os
-from config.config import DATASET_DIR
+from config.config import SCREENSHOT_DIR
 # -----------------------------
 # Screen and card areas (adjust to your screen)
 # -----------------------------
@@ -31,9 +31,9 @@ CARD_AREAS = [
 ]
 
 # Output directory
-OUTPUT_DIR = DATASET_DIR
-HASH_FILE = os.path.join(OUTPUT_DIR, "seen_hashes.json")
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+OUTPUT_DIR = SCREENSHOT_DIR
+HASH_FILE = os.path.join(SCREENSHOT_DIR, "seen_hashes.json")
+os.makedirs(SCREENSHOT_DIR, exist_ok=True)
 
 # -----------------------------
 # Thresholds for duplicate detection

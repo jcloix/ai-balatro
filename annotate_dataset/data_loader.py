@@ -1,7 +1,7 @@
 # data_loader.py
 import os
 import json
-from config.config import DATASET_DIR, LABELS_FILE, CARD_TYPES, CARDS_NAMES
+from config.config import DATASET_DIR, LABELS_FILE, CARD_TYPES, CARDS_NAMES, FIELD_LIST_MAP
 from annotate_dataset.annotate_config import TRESHOLD_TOP2
 
 import json
@@ -117,8 +117,16 @@ def build_maps(all_images, inference_file=f"{DATASET_DIR}/inference.json"):
 
 def load_labels():
     if os.path.exists(LABELS_FILE):
-        with open(LABELS_FILE, "r") as f:
-            return json.load(f)
+        try:
+            with open(LABELS_FILE, "r") as f:
+                data = json.load(f)
+                if not isinstance(data, dict):
+                    # If the file contains something other than a dict, reset
+                    return {}
+                return data
+        except json.JSONDecodeError:
+            # File exists but is empty or invalid
+            return {}
     return {}
 
 def list_images():
@@ -144,4 +152,11 @@ def compute_unique_by_type(labels):
     for v in labels.values():
         if "name" in v and "type" in v:
             unique_by_type[v["type"]].add(v["name"])
+    return unique_by_type
+
+def compute_unique_by_field(labels, field):
+    unique_by_type = {t: set() for t in FIELD_LIST_MAP[field]}
+    for v in labels.values():
+        if "name" in v and field in v:
+            unique_by_type[v[field]].add(v["name"])
     return unique_by_type

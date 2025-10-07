@@ -10,14 +10,20 @@
 - config: Global configuration
 
 ## Dataset Stats
-- Labeled: 417
+- Labeled: 1387
 - Unlabeled: 0
-- Total: 417
+- Total: 1387
 - Unique Cards:
-  - Joker: 122
+  - Joker: 133
   - Planet: 10
   - Tarot: 22
   - Spectral: 16
+- Unique cards per modifier:
+  - Base: 177
+  - Foil: 90
+  - Holographic: 43
+  - Polychrome: 58
+  - Negative: 39
 
 ## Notes
 - Using Streamlit for UI
@@ -110,3 +116,106 @@ flowchart TD
 ---
 
 ✅ This design avoids data leakage, reduces duplication, and supports multi-task learning in a clean, extensible way.
+
+
+# 🧩 Model Training Next Steps
+
+## Overview
+
+You trained a multi-head model with two classification heads:
+
+* **Card head (180 classes):** improving but limited by frozen backbone.
+* **Modifier head (5 classes):** near-perfect overall, but the *Negative* class still lags.
+
+The next steps focus on improving both heads by progressively fine-tuning the backbone, improving balance, and refining augmentations.
+
+---
+
+## 🔧 Step 1: Unfreeze Backbone (Partial Fine-Tuning)
+
+**Goal:** Allow the model to learn fine-grained features for both card and modifier heads.
+
+* Unfreeze the **last 2–3 layers** of the backbone (e.g., `layer3`, `layer4` in ResNet, or final blocks in ConvNeXt/ViT).
+* Use **differential learning rates:**
+
+  ```python
+  optimizer = AdamW([
+      {'params': backbone.parameters(), 'lr': 1e-5},
+      {'params': heads.parameters(), 'lr': 1e-4}
+  ])
+  ```
+* Keep the rest of the backbone frozen initially.
+* Add a scheduler such as:
+
+  ```python
+  scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=50)
+  ```
+
+---
+
+## ⏱️ Step 2: Extend Training Duration
+
+* Continue training up to **50–70 epochs total**.
+* Enable **EarlyStopping(patience=10)** to stop automatically if validation loss plateaus.
+* Keep monitoring Top-3 accuracy and confusion matrices.
+
+---
+
+## ⚖️ Step 3: Balance the Modifier Head (Focus on "Negative")
+
+**Issue:** The "Negative" class remains underperforming.
+
+### Actions:
+
+* Add **class weights** in the modifier loss:
+
+  ```python
+  weights = torch.tensor([1.0, 1.0, 1.0, 1.0, 3.0]).to(device)
+  criterion_modifier = CrossEntropyLoss(weight=weights)
+  ```
+
+  Adjust based on real class frequencies.
+
+* Optionally, **oversample** underrepresented classes with `WeightedRandomSampler`.
+
+* Reduce or remove strong **color-based augmentations** (e.g. `ColorJitter`, `Hue`, heavy brightness changes) since the Negative/Positive distinction is color-dependent.
+
+---
+
+## 🎯 Step 4: Optional Modifier Head Freeze
+
+Once the modifier head stabilizes (~99% accuracy across all classes):
+
+```python
+for p in modifier_head.parameters():
+    p.requires_grad = False
+```
+
+This focuses learning on improving the card head without disturbing the already good modifier classifier.
+
+---
+
+## 🧠 Step 5: Monitor & Evaluate
+
+Track during fine-tuning:
+
+* `val_card_top3_acc` → should steadily rise beyond 85–90%.
+* `val_modifier_confusion` → "Negative" diagonal entries should approach parity with others.
+* Watch for overfitting signs in val loss.
+
+---
+
+## ✅ Summary Table
+
+| Step | Action                          | Purpose                      |
+| ---- | ------------------------------- | ---------------------------- |
+| 1    | Unfreeze last 2–3 layers        | Learn finer visual cues      |
+| 2    | Train 50–70 epochs              | Stabilize long-term learning |
+| 3    | Weighted loss + oversampling    | Fix modifier imbalance       |
+| 4    | Lighten color augmentations     | Preserve color polarity      |
+| 5    | Freeze modifier head (optional) | Focus compute on card head   |
+
+---
+
+**Next session:**
+We can refine this README with actual class counts, backbone-specific unfreeze code, and augmentation inspection once you reopen the session.

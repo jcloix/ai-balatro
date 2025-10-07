@@ -49,11 +49,52 @@ def apply_checkpoint(checkpoint, model=None, optimizer=None, scheduler=None, sca
     if model is not None:
         model.load_state_dict(checkpoint["model"])
     if optimizer is not None and "optimizer" in checkpoint:
-        optimizer.load_state_dict(checkpoint["optimizer"])
+        optimizer = safe_load_optimizer_state(optimizer, checkpoint["optimizer"])
     if scheduler is not None and "scheduler" in checkpoint and checkpoint["scheduler"] is not None:
-        scheduler.load_state_dict(checkpoint["scheduler"])
+        scheduler = safe_load_scheduler_state(scheduler, checkpoint["scheduler"])
     if scaler is not None and "scaler" in checkpoint:
         scaler.load_state_dict(checkpoint["scaler"])
     start_epoch = checkpoint.get("epoch", 0) + 1
     print(f"🔄 Applied checkpoint, resuming at epoch {start_epoch}")
     return start_epoch
+
+def safe_load_optimizer_state(optimizer, checkpoint_optimizer_state):
+    """
+    Load optimizer state from checkpoint safely, ignoring missing params.
+    """
+    new_state_dict = optimizer.state_dict()
+    old_state_dict = checkpoint_optimizer_state
+
+    # Copy param groups
+    for new_group, old_group in zip(new_state_dict['param_groups'], old_state_dict['param_groups']):
+        # Only copy hyperparameters that exist
+        for key in ['lr', 'momentum', 'betas', 'weight_decay']:
+            if key in old_group:
+                new_group[key] = old_group[key]
+
+    # Copy state for matching params
+    new_state = new_state_dict['state']
+    old_state = old_state_dict['state']
+
+    for param_id, state in new_state.items():
+        if param_id in old_state:
+            # copy only the keys that exist (like momentum_buffer, exp_avg, etc.)
+            for k, v in old_state[param_id].items():
+                state[k] = v
+
+    optimizer.load_state_dict(new_state_dict)
+    return optimizer
+
+
+def safe_load_scheduler_state(scheduler, checkpoint_scheduler_state):
+    if type(scheduler) == type(checkpoint_scheduler_state):
+        try:
+            scheduler.load_state_dict(checkpoint_scheduler_state)
+        except Exception as e:
+            print(f"⚠️ Scheduler state could not be fully loaded: {e}")
+    else:
+        # fallback: just start fresh, maybe set last_epoch from checkpoint
+        if 'last_epoch' in checkpoint_scheduler_state:
+            scheduler.last_epoch = checkpoint_scheduler_state['last_epoch']
+        print("⚠️ Scheduler type changed, state partially applied or ignored")
+    return scheduler

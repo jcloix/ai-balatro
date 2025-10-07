@@ -4,20 +4,29 @@ from train_model.train_config import Config
 from config.config import MODELS_DIR
 import argparse
 from train_model.train_loops import train_one_epoch, validate
-from train_model.train_setup import prepare_training
+from train_model.train_setup import prepare_training, build_model
 from train_model.logging import log_epoch_stats
 from train_model.persistence import handle_checkpoints 
 from train_model.metrics import Metrics
 from train_model.factory import create_head
 from train_model.heads import IdentificationHead, ModifierHead 
 from train_model.persistence import load_checkpoint
+from train_model.strategies.factory import StrategyFactory
 
 
 # -----------------------------
 # Argument Parser
 # -----------------------------
+# -----------------------------
+# Argument Parser
+# -----------------------------
+# -----------------------------
+# Argument Parser
+# -----------------------------
 def parse_args():
     parser = argparse.ArgumentParser(description="Train Balatro card recognition model")
+
+    # ---- General training args ----
     parser.add_argument(
         "--tasks",
         nargs="*",
@@ -26,15 +35,50 @@ def parse_args():
         help="List of tasks (choose from identification, modifier, e.g. train.py --tasks identification modifier)"
     )
     parser.add_argument("--epochs", type=int, default=Config.EPOCHS)
-    parser.add_argument("--lr", type=float, help="Override learning rate for all heads")
     parser.add_argument("--patience", type=int, default=Config.PATIENCE)
     parser.add_argument("--log-dir", type=str, default="logs")
     parser.add_argument("--checkpoint-interval", type=int, default=Config.CHECKPOINT_INTERVAL)
-    parser.add_argument("--freeze-backbone", action="store_true", help="Freeze feature extractor layers")
-    parser.add_argument("--resume",type=str,default=None,help="Resume training from checkpoint(s)")
+    parser.add_argument("--resume", type=str, default=None, help="Resume training from checkpoint(s)")
     parser.add_argument("--use-weighted-sampler", action="store_true")
 
+    # ---- Strategy selection ----
+    parser.add_argument("--freeze-strategy", type=str, default="none",
+                        choices=["none", "high", "mid", "all"], help="Choose backbone freezing strategy")
+    parser.add_argument("--optimizer", type=str, default="simple",
+                        choices=["simple", "group"], help="Choose optimizer strategy")
+    parser.add_argument("--scheduler", type=str, default="cosine",
+                        choices=["cosine", "plateau", "step", "none"], help="Choose scheduler strategy")
+
+    # ---- Freeze strategy params ----
+    parser.add_argument("--freeze-layers-high", nargs="*", default=["layer3", "layer4"],
+                        help="Layers to unfreeze in 'high' freeze strategy")
+    parser.add_argument("--freeze-layers-mid", nargs="*", default=["layer2", "layer3", "layer4"],
+                        help="Layers to unfreeze in 'mid' freeze strategy")
+
+    # ---- Optimizer params ----
+    parser.add_argument("--optimizer-lr", type=float, default=1e-4,
+                        help="Learning rate for SimpleAdam")
+    parser.add_argument("--optimizer-lr-backbone", type=float, default=1e-5,
+                        help="Learning rate for backbone in GroupAdamW")
+    parser.add_argument("--optimizer-lr-heads", type=float, default=1e-4,
+                        help="Learning rate for heads in GroupAdamW")
+    parser.add_argument("--optimizer-weight-decay", type=float, default=1e-4,
+                        help="Weight decay for GroupAdamW")
+
+    # ---- Scheduler params ----
+    parser.add_argument("--scheduler-tmax", type=int, default=50,
+                        help="T_max for CosineAnnealingLR")
+    parser.add_argument("--scheduler-factor", type=float, default=0.1,
+                        help="Factor for ReduceLROnPlateau")
+    parser.add_argument("--scheduler-patience", type=int, default=5,
+                        help="Patience for ReduceLROnPlateau")
+    parser.add_argument("--scheduler-step-size", type=int, default=5,
+                        help="Step size for StepLR")
+    parser.add_argument("--scheduler-gamma", type=float, default=0.5,
+                        help="Gamma for StepLR")
+
     return parser.parse_args()
+
 
 # -----------------------------
 # Main Training Loop
@@ -53,7 +97,8 @@ def main():
         head.load_dataloaders(checkpoint)
 
     # Prepare the model and training config
-    state = prepare_training(heads, args.log_dir, args.lr, args.patience, args.freeze_backbone, checkpoint)
+    strategy = StrategyFactory.from_cli(args)
+    state = prepare_training(heads, strategy, args.log_dir, args.patience, checkpoint)
 
     for epoch in range(state.start_epoch, args.epochs + 1):
         metrics = []

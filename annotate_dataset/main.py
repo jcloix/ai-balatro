@@ -3,10 +3,11 @@
 import os
 import json
 import streamlit as st
+from pathlib import Path
 from PIL import Image
 from config.config import DATASET_DIR, LABELS_FILE, CARD_TYPES, RARITY_OPTIONS, MODIFIER_OPTIONS
 from annotate_dataset.annotate_config import HELPER_KEYS
-from annotate_dataset.data_loader import load_labels, list_images, build_maps, get_unlabeled_groups, parse_ids, compute_unique_by_type
+from annotate_dataset.data_loader import load_labels, list_images, build_maps, get_unlabeled_groups, compute_unique_by_type, compute_unique_by_field
 from annotate_dataset.session_utils import init_session_state, init_session_state_inputs, clear_helpers, clear_fields
 from annotate_dataset.ui_components import display_card, render_sidebar, helper_selectboxes
 
@@ -28,7 +29,8 @@ file_map = maps_obj.file_map
 prefill_map = getattr(maps_obj, "prefill_map", {})
 
 unlabeled_card_groups = get_unlabeled_groups(card_group_map, labels)
-unique_by_type = compute_unique_by_type(labels)
+unique_by_type = compute_unique_by_field(labels, "type")
+unique_by_modifier = compute_unique_by_field(labels, "modifier")
 total = len(all_images)
 labeled_count = sum(1 for f in all_images if f in labels)
 unlabeled_count = total - labeled_count
@@ -41,7 +43,7 @@ init_session_state()
 # --------------------------
 # Sidebar progress
 # --------------------------
-render_sidebar(total, labeled_count, unlabeled_count, unique_by_type)
+render_sidebar(total, labeled_count, unlabeled_count, unique_by_type, unique_by_modifier)
 
 # --------------------------
 # Main app logic
@@ -108,18 +110,38 @@ def display_main_card(current_file):
     display_card(os.path.join(DATASET_DIR, current_file), width=200)
 
 def group_section(group_files, labels):
-     # Initialize sections
-    if not st.session_state["group_section"]:
+    # Initialize section only once
+    if "group_section" not in st.session_state or not st.session_state["group_section"]:
         st.session_state["group_section"] = {f: True for f in group_files if f not in labels}
+        # Initialize checkbox keys directly in session_state
+        for f in st.session_state["group_section"]:
+            key = f"group_{f}"
+            if key not in st.session_state:
+                st.session_state[key] = st.session_state["group_section"][f]
+
     st.subheader("Cards of same group (to be labeled together)")
+
+    # Buttons side by side (compact layout)
+    col1, col2, _ = st.columns([0.25, 0.25, 1])
+    with col1:
+        if st.button("Unselect All"):
+            for f in st.session_state["group_section"]:
+                st.session_state[f"group_{f}"] = False
+            st.rerun()
+    with col2:
+        if st.button("Select All"):
+            for f in st.session_state["group_section"]:
+                st.session_state[f"group_{f}"] = True
+            st.rerun()
+
+    # Display checkboxes without explicit value argument
     num_cols = 14
     cols = st.columns(num_cols)
-    for idx, f in enumerate(list(st.session_state["group_section"].keys())):
+    for idx, f in enumerate(st.session_state["group_section"].keys()):
+        key = f"group_{f}"
         with cols[idx % num_cols]:
             st.image(Image.open(os.path.join(DATASET_DIR, f)), width=80)
-            st.session_state["group_section"][f] = st.checkbox(
-                "Include", key=f"group_{f}", value=st.session_state["group_section"][f]
-            )
+            st.checkbox("Include", key=key)
 
 def display_save_button(labels):
     if st.button("Save Labels for Current Group"):
@@ -128,14 +150,20 @@ def display_save_button(labels):
         rarity_to_save = st.session_state["card_rarity"]
         modifier_to_save = st.session_state["card_modifier"]
 
+        # Read checkboxes dynamically from session_state
         if "group_section" in st.session_state:
-            for f, include in st.session_state["group_section"].items():
+            for f in list(st.session_state["group_section"].keys()):
+                checkbox_key = f"group_{f}"
+                include = st.session_state.get(checkbox_key, False)
+                st.session_state["group_section"][f] = include  # sync for consistency
+
                 if include:
                     labels[f] = {
                         "name": name_to_save,
                         "type": type_to_save,
                         "rarity": rarity_to_save,
-                        "modifier": modifier_to_save
+                        "modifier": modifier_to_save,
+                        "full_path": str(Path(DATASET_DIR) / f).replace("\\", "/")
                     }
         with open(LABELS_FILE, "w") as fw:
             json.dump(labels, fw, indent=2)

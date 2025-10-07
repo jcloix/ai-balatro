@@ -16,9 +16,9 @@ Make sure your environment has the required packages:
 
 pip install pyautogui pillow imagehash
 
-Ensure that the `data/unlabeled/` folder exists:
+Ensure that the `data/screenshots/` folder exists:
 
-mkdir -p data/unlabeled
+mkdir -p data/screenshots
 
 ## Hierarchical Pseudo-Grouping
 
