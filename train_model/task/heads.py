@@ -2,11 +2,13 @@
 import json
 import os
 from abc import ABC
-from train_model.factory import register_head
+from train_model.task.factory import register_head
 from train_model.train_config import Config
 from config.config import LABELS_FILE, AUGMENTED_LABELS_FILE
 from train_model.data_loader_utils import stratified_split_with_aug, get_train_val_loaders
 from train_model.dataset import CardDataset
+from train_model.metrics.factory import create_metrics
+from train_model.metrics.metrics import Metrics
 from torch import nn
 import torch
 
@@ -19,7 +21,8 @@ class ClassificationHead(ABC):
         "val_transform":"test",
         "labels_file":LABELS_FILE,
         "augmented_labels_file":AUGMENTED_LABELS_FILE,
-        "field":"name"
+        "field":"name",
+        "metrics": ["top1_acc", "cm"], 
     }
     def __init__(self, name, config=None):
         self.name = name
@@ -38,6 +41,8 @@ class ClassificationHead(ABC):
         self.labels_file = cfg["labels_file"]
         self.augmented_labels_file = cfg["augmented_labels_file"]
         self.field = cfg["field"]
+        self.metrics_names = cfg["metrics"]
+        self.metrics = Metrics(create_metrics(self.metrics_names)) # Add automatically EpochSummary
         self.num_classes=0
     
     def init_criterion(self, model, device):
@@ -84,16 +89,16 @@ class ClassificationHead(ABC):
         return train_dataset, val_dataset
     
     def get_dataloaders(self, train_dataset, val_dataset, batch_size, use_weighted_sampler):
-        """
-        from torch.utils.data import WeightedRandomSampler
-
-class_weights = [1.0 / freq[c] for c in class_indices]
-sampler = WeightedRandomSampler(class_weights, num_samples=len(dataset), replacement=True)
-        """
         return get_train_val_loaders(train_dataset, val_dataset, batch_size, use_weighted_sampler)
     
     def build_criterion(self, model, device):
         return nn.CrossEntropyLoss()
+    
+    def compute_metrics(self, state, epoch_res):
+        self.metrics.compute_all(self, state, epoch_res)
+
+    def log_metrics(self, state, epoch_res, writer=None):
+        self.metrics.log_all(self, state, epoch_res, writer)
 
 
 @register_head("identification")
@@ -103,7 +108,8 @@ class IdentificationHead(ClassificationHead):
         "train_transform":"heavy",
         "val_transform":"test",
         "labels_file":LABELS_FILE,
-        "augmented_labels_file":"data/augmented_identity/augmented.json"
+        "augmented_labels_file":"data/augmented_identity/augmented.json",
+        "metrics": ["top1_acc","confusion_summary"], #too many classes so "cm" is not appropirate  
     }
 
 

@@ -1,8 +1,8 @@
 import pytest
-from train_model.factory import HEAD_REGISTRY, create_head
+from train_model.task.factory import HEAD_REGISTRY, create_head
 
 # Import the head classes to trigger the @register_head decorator
-from train_model.heads import IdentificationHead, ModifierHead
+from train_model.task.heads import IdentificationHead, ModifierHead
 
 @pytest.fixture(autouse=True)
 def reset_registry():

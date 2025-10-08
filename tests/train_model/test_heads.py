@@ -3,7 +3,7 @@ import tempfile
 import json
 from torch import nn
 from unittest.mock import patch, MagicMock
-from train_model.heads import ClassificationHead, IdentificationHead, ModifierHead
+from train_model.task.heads import ClassificationHead, IdentificationHead, ModifierHead
 
 # --------------------------
 # Fixtures

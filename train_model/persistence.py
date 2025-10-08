@@ -1,6 +1,7 @@
 #persistence.py
 import torch
 import os
+from config.config import MODELS_DIR 
 
 def save_checkpoint(training_state, heads, path, epoch):
     checkpoint = {
@@ -24,7 +25,8 @@ def save_checkpoint(training_state, heads, path, epoch):
     print(f"✅ Saved checkpoint to {path}")
     
 
-def handle_checkpoints(training_state, heads, val_loss, best_val_loss, epoch, checkpoint_dir, checkpoint_interval=5):
+def handle_checkpoints(training_state, heads, val_loss, epoch, checkpoint_dir=MODELS_DIR, checkpoint_interval=5):
+    best_val_loss = training_state.best_val_loss
     # Save best model
     if val_loss < best_val_loss:
         best_val_loss = val_loss
@@ -49,9 +51,9 @@ def apply_checkpoint(checkpoint, model=None, optimizer=None, scheduler=None, sca
     if model is not None:
         model.load_state_dict(checkpoint["model"])
     if optimizer is not None and "optimizer" in checkpoint:
-        optimizer = safe_load_optimizer_state(optimizer, checkpoint["optimizer"])
+        safe_load_optimizer_state(optimizer, checkpoint["optimizer"])
     if scheduler is not None and "scheduler" in checkpoint and checkpoint["scheduler"] is not None:
-        scheduler = safe_load_scheduler_state(scheduler, checkpoint["scheduler"])
+        safe_load_scheduler_state(scheduler, checkpoint["scheduler"])
     if scaler is not None and "scaler" in checkpoint:
         scaler.load_state_dict(checkpoint["scaler"])
     start_epoch = checkpoint.get("epoch", 0) + 1
@@ -86,15 +88,23 @@ def safe_load_optimizer_state(optimizer, checkpoint_optimizer_state):
     return optimizer
 
 
-def safe_load_scheduler_state(scheduler, checkpoint_scheduler_state):
-    if type(scheduler) == type(checkpoint_scheduler_state):
+def safe_load_scheduler_state(scheduler_wrapper, checkpoint_scheduler_state):
+    """
+    scheduler_wrapper: your SchedulerStrategy instance
+    checkpoint_scheduler_state: dict from state_dict()
+    """
+    # The scheduler is a custom scheduler wrapping a real one
+    inner_scheduler = getattr(scheduler_wrapper, "scheduler", None)
+    
+    if inner_scheduler and type(inner_scheduler) == type(checkpoint_scheduler_state):
         try:
-            scheduler.load_state_dict(checkpoint_scheduler_state)
+            inner_scheduler.load_state_dict(checkpoint_scheduler_state)
         except Exception as e:
             print(f"⚠️ Scheduler state could not be fully loaded: {e}")
     else:
-        # fallback: just start fresh, maybe set last_epoch from checkpoint
-        if 'last_epoch' in checkpoint_scheduler_state:
-            scheduler.last_epoch = checkpoint_scheduler_state['last_epoch']
+        # fallback: just set last_epoch if present
+        if inner_scheduler and 'last_epoch' in checkpoint_scheduler_state:
+            inner_scheduler.last_epoch = checkpoint_scheduler_state['last_epoch']
         print("⚠️ Scheduler type changed, state partially applied or ignored")
-    return scheduler
+
+    return scheduler_wrapper

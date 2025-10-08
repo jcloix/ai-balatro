@@ -1,18 +1,18 @@
 import torch
 import pytest
 import numpy as np
-from train_model import metrics
+from train_model import metrics_v2
 
 # -----------------------------
 # Tests for Metrics class
 # -----------------------------
 def test_metrics_from_validation_and_epoch():
-    val_metrics = metrics.Metrics.from_validation(val_loss=0.25, topk_acc=0.4, cm=np.array([[2,1],[0,3]]))
+    val_metrics = metrics_v2.Metrics.from_validation(val_loss=0.25, topk_acc=0.4, cm=np.array([[2,1],[0,3]]))
     assert val_metrics.val_loss == 0.25
     assert val_metrics.topk_acc == 0.4
     assert isinstance(val_metrics.cm, np.ndarray)
 
-    epoch_metrics = metrics.Metrics.from_epoch(train_loss=0.1, val_metrics=val_metrics)
+    epoch_metrics = metrics_v2.Metrics.from_epoch(train_loss=0.1, val_metrics=val_metrics)
     assert epoch_metrics.train_loss == 0.1
     assert epoch_metrics.val_loss == val_metrics.val_loss
     assert epoch_metrics.topk_acc == val_metrics.topk_acc
@@ -34,9 +34,9 @@ def test_top_k_accuracy():
     labels = torch.tensor([1, 0, 2])  # true labels
 
     # Compute top-k accuracies
-    acc1 = metrics.top_k_accuracy(outputs, labels, k=1)
-    acc2 = metrics.top_k_accuracy(outputs, labels, k=2)
-    acc3 = metrics.top_k_accuracy(outputs, labels, k=3)
+    acc1 = metrics_v2.top_k_accuracy(outputs, labels, k=1)
+    acc2 = metrics_v2.top_k_accuracy(outputs, labels, k=2)
+    acc3 = metrics_v2.top_k_accuracy(outputs, labels, k=3)
 
     # Check expected values
     # sample-wise top-1 correct: [True, False, True] → 2/3 = 0.6667
@@ -64,7 +64,7 @@ def test_compute_confusion_matrix(tmp_path):
     device = torch.device("cpu")
     num_classes = 2
 
-    cm = metrics.compute_confusion_matrix(model, loader, device, num_classes, task_name=None)
+    cm = metrics_v2.compute_confusion_matrix(model, loader, device, num_classes, task_name=None)
     assert isinstance(cm, np.ndarray)
     assert cm.shape == (num_classes, num_classes)
     # Should sum to number of samples

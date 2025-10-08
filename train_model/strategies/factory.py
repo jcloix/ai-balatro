@@ -32,7 +32,8 @@ class StrategyFactory:
             "mid": UnfreezeMidLevel(layers=self.args.freeze_layers_mid),
             "all": UnfreezeAll(),
         }
-        return mapping.get(self.freeze_name, UnfreezeAll())
+        self.freeze_strategy = mapping.get(self.freeze_name, UnfreezeAll())
+        return self.freeze_strategy
 
     # -----------------------------
     # Optimizer strategy
@@ -46,7 +47,8 @@ class StrategyFactory:
                 weight_decay=self.args.optimizer_weight_decay,
             ),
         }
-        return mapping.get(self.optimizer_name, SimpleAdamStrategy(lr=self.args.optimizer_lr))
+        self.optimizer_strategy = mapping.get(self.optimizer_name, SimpleAdamStrategy(lr=self.args.optimizer_lr))
+        return self.optimizer_strategy
 
     # -----------------------------
     # Scheduler strategy
@@ -64,7 +66,8 @@ class StrategyFactory:
             ),
             "none": NoScheduler(),
         }
-        return mapping.get(self.scheduler_name, CosineAnnealing(T_max=self.args.scheduler_tmax))
+        self.scheduler_strategy = mapping.get(self.scheduler_name, CosineAnnealing(T_max=self.args.scheduler_tmax))
+        return self.scheduler_strategy
 
     # -----------------------------
     # Apply all strategies
@@ -72,6 +75,8 @@ class StrategyFactory:
     def apply(self, model):
         freeze_strategy = self.build_freeze()
         freeze_strategy.apply(model)
-        optimizer = self.build_optimizer().build(model)
-        scheduler = self.build_scheduler().build(optimizer)
-        return model, optimizer, scheduler
+        optimizer_wrapper = self.build_optimizer()
+        optimizer = optimizer_wrapper.wrapper_build(model)
+        scheduler_wrapper = self.build_scheduler()
+        scheduler = scheduler_wrapper.wrapper_build(optimizer)
+        return model, optimizer_wrapper, scheduler_wrapper

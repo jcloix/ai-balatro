@@ -4,14 +4,14 @@ from train_model.train_config import Config
 from config.config import MODELS_DIR
 import argparse
 from train_model.train_loops import train_one_epoch, validate
-from train_model.train_setup import prepare_training, build_model
-from train_model.logging import log_epoch_stats
+from train_model.train_setup import prepare_training
+from train_model.train_state import EpochResult
 from train_model.persistence import handle_checkpoints 
-from train_model.metrics import Metrics
-from train_model.factory import create_head
-from train_model.heads import IdentificationHead, ModifierHead 
+from train_model.task.factory import create_head
 from train_model.persistence import load_checkpoint
 from train_model.strategies.factory import StrategyFactory
+from train_model.task.heads import IdentificationHead, ModifierHead #Needed for the factory
+import warnings
 
 
 # -----------------------------
@@ -79,11 +79,17 @@ def parse_args():
 
     return parser.parse_args()
 
+def filter_warnings():
+    warnings.filterwarnings(
+        "ignore",
+        message="The number of unique classes is greater than 50% of the number of samples"
+    )
 
 # -----------------------------
 # Main Training Loop
 # -----------------------------
 def main():
+    filter_warnings()
     args = parse_args()
 
     # Load checkpoint first
@@ -101,38 +107,29 @@ def main():
     state = prepare_training(heads, strategy, args.log_dir, args.patience, checkpoint)
 
     for epoch in range(state.start_epoch, args.epochs + 1):
-        metrics = []
+        epoch_res_list = []
         for head in heads:
+            epoch_res = EpochResult(epoch=epoch)
             # Train for one epoch
-            train_loss = train_one_epoch(state.model, head.train_loader, head.criterion, state.optimizer, state.device, state.scaler, head.name)
+            train_loss = train_one_epoch(head, state, epoch_res)
             
             # Validate
-            val_metrics = validate(state.model, head.val_loader, head.criterion, state.device, compute_metrics=True, task_name=head.name, num_classes=head.num_classes)
+            val_loss = validate(head, state, epoch_res)
 
             # Agregate metrics
-            epoch_metrics = Metrics.from_epoch(train_loss, val_metrics)
-            metrics.append(epoch_metrics)
+            epoch_res_list.append(epoch_res)
+            head.compute_metrics(state, epoch_res)
 
             # Log stats
-            log_epoch_stats(epoch, state.optimizer, epoch_metrics, state.writer, head.train_loader.classes, head.name)
-        # Compute Loss on all heads (Average)
-        epoch_val_loss = max(metric.val_loss for metric in metrics)
-        # Step scheduler (Adjusting the learning rate during training can help the model converge faster)
-        if isinstance(state.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-            state.scheduler.step(epoch_val_loss)
-        else:
-            state.scheduler.step()
+            head.log_metrics(state, epoch_res, state.writer)
+        # Compute Loss on all heads (Max)
+        epoch_val_loss = max(epoch_res.val_loss for epoch_res in epoch_res_list)
+        
+        # Apply the scheduler step.
+        state.scheduler.step(epoch_val_loss)
         
         # Handle checkpoints (best model + periodic snapshots)
-        state.best_val_loss = handle_checkpoints(
-            state,
-            heads,
-            epoch_val_loss,
-            state.best_val_loss,
-            epoch,
-            checkpoint_dir=MODELS_DIR,
-            checkpoint_interval=args.checkpoint_interval,
-        )
+        state.best_val_loss = handle_checkpoints(state, heads, epoch_val_loss, epoch, checkpoint_interval=args.checkpoint_interval)
 
         # Early stopping
         state.early_stopping.step(epoch_val_loss)

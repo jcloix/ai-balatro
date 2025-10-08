@@ -1,7 +1,7 @@
 import pytest
 
 # Import the registry functions
-from train_model.factory import HEAD_REGISTRY, register_head, create_head  # adjust import
+from train_model.task.factory import HEAD_REGISTRY, register_head, create_head  # adjust import
 
 # -----------------------------
 # Dummy classes for testing

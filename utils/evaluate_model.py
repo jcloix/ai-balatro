@@ -7,7 +7,7 @@ import argparse
 import json
 import os
 
-CHECKPOINT = "data/models/best-model-duo-45.pth"
+CHECKPOINT = "data/models/identity_card.pth"
 
 # Example Command
 # python -m utils.evaluate_model --labels-json "data/dataset_default/labels.JSON" 

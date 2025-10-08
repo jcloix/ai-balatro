@@ -1,6 +1,6 @@
 # tests/train_model/test_train.py
 from unittest.mock import patch, MagicMock
-from train_model.metrics import Metrics
+from train_model.metrics_v2 import Metrics
 from train_model import train
 import sys
 
@@ -245,7 +245,7 @@ def test_main_resume(
     mock_validate.return_value = val_metrics
 
     # Metrics.from_epoch returns real Metrics object
-    from train_model.metrics import Metrics
+    from train_model.metrics_v2 import Metrics
     mock_metrics_cls.side_effect = lambda train_loss, val_metrics: Metrics(
         train_loss=train_loss,
         val_loss=val_metrics.val_loss,
@@ -289,7 +289,7 @@ def test_main_resume(
 @patch("train_model.train.validate")
 def test_main_early_stop(mock_validate, mock_train, mock_prepare, mock_create_head, mock_handle_checkpoints):
     import numpy as np
-    from train_model.metrics import Metrics
+    from train_model.metrics_v2 import Metrics
 
     # Dummy head
     head = MagicMock()
