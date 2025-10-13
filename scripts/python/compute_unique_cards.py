@@ -1,5 +1,4 @@
 import json
-import os
 
 # Paths
 labels_path = "data/dataset_default/labels.json"  # your current JSON

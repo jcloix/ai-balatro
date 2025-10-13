@@ -29,18 +29,41 @@ class TestUIComponents(unittest.TestCase):
             "Tarot": [],
             "Spectral": [4, 5, 6]
         }
-        ui_components.render_sidebar(total=10, labeled_count=4, unlabeled_count=6, unique_by_type=unique_by_type)
+        unique_by_modifier = {
+            "Base": [1, 2],
+            "Foil": [3],
+            "Holographic": [],
+            "Polychrome": [4],
+            "Negative": [5, 6]
+        }
+
+        ui_components.render_sidebar(
+            total=10,
+            labeled_count=4,
+            unlabeled_count=6,
+            unique_by_type=unique_by_type,
+            unique_by_modifier=unique_by_modifier
+        )
 
         # Check sidebar methods called
         mock_sidebar.title.assert_called_with("📊 Labeling Progress")
         mock_sidebar.write.assert_any_call("✅ Labeled: 4")
         mock_sidebar.write.assert_any_call("🕓 Unlabeled: 6")
         mock_sidebar.write.assert_any_call("📦 Total: 10")
-        mock_sidebar.markdown.assert_called_with("### 🔎 Unique Cards by Type")
+
+        mock_sidebar.markdown.assert_any_call("### 🔎 Unique Cards by Type")
         mock_sidebar.write.assert_any_call("🃏 Joker: 2")
         mock_sidebar.write.assert_any_call("🪐 Planet: 1")
         mock_sidebar.write.assert_any_call("🔮 Tarot: 0")
         mock_sidebar.write.assert_any_call("👻 Spectral: 3")
+
+        mock_sidebar.markdown.assert_any_call("### ✨ Unique Cards by Modifier")
+        mock_sidebar.write.assert_any_call("🎴 Base: 2")
+        mock_sidebar.write.assert_any_call("🌈 Foil: 1")
+        mock_sidebar.write.assert_any_call("💎 Holographic: 0")
+        mock_sidebar.write.assert_any_call("🎨 Polychrome: 1")
+        mock_sidebar.write.assert_any_call("🕳️ Negative: 2")
+
 
     # ---------------------------
     # Test helper_selectboxes

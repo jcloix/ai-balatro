@@ -1,39 +1,30 @@
-# Augment identity cards
-python augment_script.py --input data/dataset_default --output data/augmented_identity --labels data/dataset_default/labels.json --balance-by name 
-# Augment modifier cards
+# Step 1: Collect data + run AHK script to help
+python -m build_dataset.main  
+/scripts/ahk/build_dataset.ahk 
+
+# Step 2: Annotate labels (Optionally: Can use pretrained model for inference)
+python -m utils.inference_utils --img-dir "data/dataset_default" --task-name identification --topk 2 --out-json "data/dataset_default/inference.json"
+
+python -m streamlit run annotate_dataset/main.py
+
+# Step 3: Generate offline augmentations
+# Generate for identification task
+python -m augment_dataset.main --input data/dataset_default --output data/augmented_identity --labels data/dataset_default/labels.json --no-blur --no-bc --balance-by name
+python -m augment_dataset.save_augmented_labels --aug-dir "data/augmented_identity" --labels "data/augmented_identity/augmented.json"
+# Generate for modifier task
 python -m augment_dataset.main --input data/dataset_default --output data/augmented_modifier --labels data/dataset_default/labels.json --balance-by modifier
+python -m augment_dataset.save_augmented_labels --aug-dir "data/augmented_modifier" --labels "data/augmented_modifier/augmented.json"
 
-# Create augmented.json for both augmentation folders
-python -m augment_dataset.save_augmented_labels --aug-dir data/augmented_identity --labels data/dataset_default/labels.json
-python -m augment_dataset.save_augmented_labels --aug-dir data/augmented_modifier --labels data/dataset_default/labels.json
+# Step 4: Train the model
+# Train the model - identification
+python -m train_model.train --tasks identification --epochs 7 --log-dir runs/identification --freeze-strategy all --optimizer simple --scheduler none --use-weighted-sampler
 
+# Train the model - identification
+python -m train_model.train --tasks modifier --epochs 10 --log-dir runs/modifier --freeze-strategy all --optimizer simple --scheduler none --use-weighted-sampler
 
-# Train the model, first freeze for 15 epochs, then unfreeze for 50 epochs
-tensorboard --logdir runs/duo_head_training
-python -m train_model.train --epochs 15 --log-dir runs/duo_head_training --freeze-backbone
-# Train longer with adjusted strategies
-tensorboard --logdir runs/duo_head_finetune
-python -m train_model.train  --epochs 60  --log-dir runs/duo_head_finetune  --freeze-strategy high --use-weighted-sampler  --resume data/models/best_model.pth  --optimizer group  --scheduler cosine
-
-# Fine tune to win again 2% - Stopped at 59, best model at 55
-tensorboard --logdir runs/duo_head_finetune
-python -m train_model.train --epochs 70 --patience 10 --log-dir runs/duo_head_finetune --resume data/models/best_model.pth --freeze-strategy mid --use-weighted-sampler --optimizer group --optimizer-lr-backbone 1e-5 --optimizer-lr-heads 5e-5 --optimizer-weight-decay 1e-4 --scheduler cosine --scheduler-tmax 50
-
-tensorboard --logdir runs/duo_head_finetune_v2
-python -m train_model.train --epochs 80 --patience 10 --log-dir runs/duo_head_finetune_v2 --resume data/models/best-model-duo-45.pth --freeze-strategy mid --use-weighted-sampler --optimizer group --optimizer-lr-backbone 8e-6 --optimizer-lr-heads 4e-5 --optimizer-weight-decay 1e-4 --scheduler cosine --scheduler-tmax 50
+# Step5: TODO
 
 
 
-python -m train_model.train \
-  --epochs 70 \
-  --patience 10 \
-  --log-dir runs/duo_head_finetune_v2 \
-  --resume data/models/epoch_45.pth \
-  --freeze-strategy mid \
-  --use-weighted-sampler \
-  --optimizer group \
-  --optimizer-lr-backbone 8e-6 \
-  --optimizer-lr-heads 4e-5 \
-  --optimizer-weight-decay 1e-4 \
-  --scheduler cosine \
-  --scheduler-tmax 50
+
+

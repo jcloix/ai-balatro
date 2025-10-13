@@ -4,6 +4,8 @@ from torch.utils.data import DataLoader, WeightedRandomSampler
 from collections import defaultdict
 import random
 import math
+import json
+from train_model.train_config import Config 
 # --------------------------
 #  Group filenames by key
 # --------------------------
@@ -66,6 +68,7 @@ def build_labels_dict(files, original_labels, augmented_labels=None):
 def stratified_split_with_aug(original_labels, augmented_labels=None, val_split=0.1, key="name"):
     train_labels = {}
     val_labels = {}
+    split_info = {}  # Store info per card_name
 
     orig_by_name = group_by_card(original_labels, key)
     aug_by_name  = group_by_card(augmented_labels, key) if augmented_labels else defaultdict(list)
@@ -84,6 +87,17 @@ def stratified_split_with_aug(original_labels, augmented_labels=None, val_split=
         train_labels.update(build_labels_dict(train_files, original_labels, augmented_labels))
         val_labels.update(build_labels_dict(val_files, original_labels, augmented_labels))
 
+        # Save split info
+        split_info[card_name] = {
+            "train": train_files,
+            "val": val_files
+        }
+
+    # Save to JSON
+    with open(Config.OUTPUT_SPLIT_TRAIN_VAL, "w") as f:
+        json.dump(split_info, f, indent=4)
+
+    print(f"[INFO] Train/val split saved to {Config.OUTPUT_SPLIT_TRAIN_VAL}")
     return train_labels, val_labels
 
 # --------------------------

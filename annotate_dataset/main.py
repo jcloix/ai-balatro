@@ -17,33 +17,64 @@ from annotate_dataset.ui_components import display_card, render_sidebar, helper_
 st.set_page_config(page_title="Card Labeler", layout="wide")
 
 # --------------------------
-# Load data
+# Global placeholders
 # --------------------------
-labels = load_labels()
-all_images = list_images()
-maps_obj  = build_maps(all_images)
-# Extract maps
-card_group_map = maps_obj.group_map
-cluster_map = maps_obj.cluster_map
-file_map = maps_obj.file_map
-prefill_map = getattr(maps_obj, "prefill_map", {})
+labels = {}
+all_images = []
+maps_obj = None
+card_group_map = {}
+cluster_map = {}
+file_map = {}
+prefill_map = {}
+unlabeled_card_groups = []
+unique_by_type = {}
+unique_by_modifier = {}
+total = 0
+labeled_count = 0
+unlabeled_count = 0
 
-unlabeled_card_groups = get_unlabeled_groups(card_group_map, labels)
-unique_by_type = compute_unique_by_field(labels, "type")
-unique_by_modifier = compute_unique_by_field(labels, "modifier")
-total = len(all_images)
-labeled_count = sum(1 for f in all_images if f in labels)
-unlabeled_count = total - labeled_count
 
-# --------------------------
-# Initialize session
-# --------------------------
-init_session_state()
+def init_app():
+    """Initialize data and render sidebar when running in Streamlit."""
+    global labels, all_images, maps_obj
+    global card_group_map, cluster_map, file_map, prefill_map
+    global unlabeled_card_groups, unique_by_type, unique_by_modifier
+    global total, labeled_count, unlabeled_count
 
-# --------------------------
-# Sidebar progress
-# --------------------------
-render_sidebar(total, labeled_count, unlabeled_count, unique_by_type, unique_by_modifier)
+    # --------------------------
+    # Load data
+    # --------------------------
+    labels = load_labels()
+    all_images = list_images()
+    maps_obj = build_maps(all_images)
+
+    # Extract maps
+    card_group_map = maps_obj.group_map
+    cluster_map = maps_obj.cluster_map
+    file_map = maps_obj.file_map
+    prefill_map = getattr(maps_obj, "prefill_map", {})
+
+    unlabeled_card_groups = get_unlabeled_groups(card_group_map, labels)
+    unique_by_type = compute_unique_by_field(labels, "type")
+    unique_by_modifier = compute_unique_by_field(labels, "modifier")
+    total = len(all_images)
+    labeled_count = sum(1 for f in all_images if f in labels)
+    unlabeled_count = total - labeled_count
+
+    # --------------------------
+    # Initialize session
+    # --------------------------
+    init_session_state()
+
+    # --------------------------
+    # Sidebar progress
+    # --------------------------
+    render_sidebar(total, labeled_count, unlabeled_count, unique_by_type, unique_by_modifier)
+
+    # --------------------------
+    # Display main body
+    # --------------------------
+    display_body()
 
 # --------------------------
 # Main app logic
@@ -227,4 +258,8 @@ def display_body():
     cluster_id = file_map[current_file]["cluster_id"]
     cluster_section(cluster_id, group_files, labels)
 
-display_body()
+# --------------------------
+# Run only in Streamlit or directly
+# --------------------------
+if __name__ == "__main__" or st.runtime.exists():
+    init_app()

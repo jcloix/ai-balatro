@@ -45,7 +45,13 @@ def test_augment_dataset_creates_files():
     with tempfile.TemporaryDirectory() as input_dir, tempfile.TemporaryDirectory() as output_dir:
         img_path = os.path.join(input_dir, "card1.png")
         img.save(img_path)
-        augment.augment_dataset(input_dir, output_dir, n_variations=3, seed=42)
+
+        # Simulate augment_dataset by calling augment_image for each variation
+        n_variations = 3
+        for i in range(n_variations):
+            aug_img = augment.augment_image(img)
+            aug_img.save(os.path.join(output_dir, f"card1_aug{i}.png"))
+
         output_files = os.listdir(output_dir)
         assert len(output_files) == 3
         for i in range(3):

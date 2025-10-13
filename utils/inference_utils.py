@@ -1,4 +1,4 @@
-# train_model/inference_utils.py
+# utils/inference_utils.py
 import torch
 from torchvision import transforms
 from PIL import Image
@@ -9,10 +9,10 @@ import os
 import glob
 
 # Example Command
-# python -m utils.inference_utils --img-dir "data/dataset_default" --task-name identification --topk 2 --out-json "data/dataset_default/inference2.json"
+# python -m utils.inference_utils --img-dir "data/dataset_default" --task-name identification --topk 2 --out-json "data/dataset_default/inference.json"
 # python -m utils.inference_utils --img-path "data/dataset_default/cluster1_card36_id610.png" --topk 3 
 
-CHECKPOINT="data/models/identity_card.pth"
+CHECKPOINT="data/models/best_model.pth"
 
 # -----------------------------
 # Load trained model
@@ -44,6 +44,7 @@ def preprocess_image(image_path, size=(224, 224)):
     transform = transforms.Compose([
         transforms.Resize(size),
         transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
     return transform(img).unsqueeze(0)
 

@@ -1,18 +1,24 @@
 # train_model 🧠
 
-The `train_model` module is part of the **Balatro** project.  
-Its purpose is to **train an AI model to recognize cards** based on the annotated dataset.  
+The `train_model` module is part of the **Balatro** project.
+Its purpose is to **train an AI model to recognize cards** based on the annotated dataset.
 The trained model can later be used for real-time card identification with `identify_card` module.
 
 ---
 
 ## 🚀 Features
 
-- Load annotated dataset created with `annotate_dataset`
-- Train a model to recognize cards
-- Support for detecting **polychrome variations**
-- Save trained models for later inference
-- Configurable training parameters (epochs, batch size, etc.)
+* Load annotated dataset created with `annotate_dataset`
+* Train a model to recognize cards
+* Support for detecting **identity cards** and **modifier variations**
+* Save trained models for later inference
+* Configurable training parameters (epochs, batch size, etc.)
+* Configurable training strategy (Freeze, optimizer, scheduler, etc.)
+* Scalable and flexible implementation of **task**
+* Allow to train multi-head model or one head model
+* Support checkpoints in case of failure or change of strategy for one model
+* Add runtime augmentations to augment the dataset with noise
+* Generic implementation of metrics to allow adding more in the future
 
 ---
 
@@ -21,7 +27,6 @@ The trained model can later be used for real-time card identification with `iden
 Make sure you are inside the Balatro project folder and dependencies are installed:
 
 ```bash
-cd balatro
 pip install -r requirements.txt
 ```
 
@@ -38,29 +43,32 @@ python -m train_model.train
 Or with arguments (See CLI section)
 
 ```bash
-python -m train_model.train --tasks identification --epochs 30 --lr 0.0001 --log-dir runs/card_training --freeze-backbone
-
+python -m train_model.train --tasks identification --epochs 7 --log-dir runs/identification --freeze-strategy all --optimizer simple --scheduler none --use-weighted-sampler
 ```
 
 Monitoring can be don with Tensorboard
+
 ```bash
-tensorboard --logdir runs/card_training
+tensorboard --logdir runs/identification
 ```
 
 ### Example workflow
 
 1. Prepare your dataset using:
-   - `build_dataset` (capture images)
-   - `annotate_dataset` (organize & label)
+
+   * `build_dataset` (capture images)
+   * `annotate_dataset` (organize & label)
+   * `augment_dataset` (Optionnally add offline augmentations)
 
 2. Start training:
+
    ```bash
    python -m train_model --epochs 20 --batch-size 32
    ```
 
-3. The trained model will be saved in the `models/` directory.
+3. The trained model will be saved in the `data/models/` directory.
 
-4. Use the trained model with `identify_card` for real-time recognition.
+4. Use the trained model with `utils/inference_utils.py` for real-time recognition.
 
 ---
 
@@ -72,7 +80,7 @@ The `train` module provides full functionality to train, validate, and monitor t
 
 ### 1. Data Handling
 
-* **Merge Labels:** Combine original and augmented labels into a single mapping for training.
+* **Original/Augmented images:** Uses original and augmented labels for training.
 * **Custom Dataset:** `CardDataset` loads images and labels from a dictionary or label files.
 * **Train/Validation Split:** Split datasets into train/val sets with optional transforms.
 * **Weighted Sampling:** Handle class imbalance with a `WeightedRandomSampler` if requested.
@@ -93,6 +101,7 @@ The `train` module provides full functionality to train, validate, and monitor t
 
 * **Top-K Accuracy:** Compute Top-3 accuracy to measure how often the correct label is within the top-k predictions.
 * **Confusion Matrix:** Compute class-by-class performance for detailed error analysis.
+* **Confusion Summary:** Compute class-by-class performance summary for task with many classes.
 
 ### 5. Logging & Visualization
 
@@ -121,22 +130,39 @@ The `train` module provides full functionality to train, validate, and monitor t
   * `NUM_CLASSES` : Number of output classes
   * `TRANSFORMS` : Dictionary of image transformations (`train` / `test` / `none` / `heavy` / `light`) for dynamic augmentation
 
-
 ## ⚙️ Options
 
+### General
+
+* `--tasks` : Tasks to train (e.g. `identification`, `modifier`)
 * `--epochs` : Number of training epochs (default from `Config.EPOCHS`)
-* `--batch-size` : Batch size for training and validation (default `Config.BATCH_SIZE`)
-* `--lr` : Learning rate (default `Config.LEARNING_RATE`)
-* `--val-split` : Fraction of dataset used for validation (default `Config.VAL_SPLIT`)
-* `--num-classes` : Override number of output classes (default `Config.NUM_CLASSES`)
-* `--log-dir` : Directory for TensorBoard logs
+* `--patience` : Early stopping patience
+* `--log-dir` : Directory for TensorBoard logs (default `logs`)
 * `--checkpoint-interval` : Frequency (in epochs) to save periodic snapshots
-* `--no-augmented` : Skip offline augmentations
-* `--freeze-backbone` : Freeze feature extractor layers
 * `--resume` : Path to a checkpoint to resume training
 * `--use-weighted-sampler` : Enable class-balanced sampling
-* `--train-transform` : Override default transform for training (Accept values from Config.TRANSFORMS)
-* `--val-transform` : Override default transform for validation (Accept values from Config.TRANSFORMS)
+
+### Strategy Selection
+
+* `--freeze-strategy` : Freezing strategy (`none`, `high`, `mid`, `all`)
+* `--optimizer` : Optimizer type (`simple`, `group`)
+* `--scheduler` : Scheduler type (`cosine`, `plateau`, `step`, `none`)
+
+### Optimizer Parameters
+
+* `--optimizer-lr` : Learning rate for simple Adam
+* `--optimizer-lr-backbone` : LR for backbone in GroupAdamW
+* `--optimizer-lr-heads` : LR for heads in GroupAdamW
+* `--optimizer-weight-decay` : Weight decay for GroupAdamW
+
+### Scheduler Parameters
+
+* `--scheduler-tmax` : T_max for CosineAnnealingLR
+* `--scheduler-eta_min` : eta_min for CosineAnnealingLR
+* `--scheduler-factor` : Factor for ReduceLROnPlateau
+* `--scheduler-patience` : Patience for ReduceLROnPlateau
+* `--scheduler-step-size` : Step size for StepLR
+* `--scheduler-gamma` : Gamma for StepLR
 
 ---
 
@@ -146,7 +172,7 @@ The `train` module provides full functionality to train, validate, and monitor t
 build_dataset  --->  annotate_dataset  --->  train_model  --->  identify_card
 ```
 
-
+---
 
 # Data Collection & Training Strategy Decisions – Balatro
 
@@ -154,7 +180,7 @@ This document outlines the decisions and trade-offs for building the dataset of 
 
 ---
 
-##  Training strategies
+## Training strategies
 
 ### 1. Framework Choice
 
@@ -200,97 +226,6 @@ This document outlines the decisions and trade-offs for building the dataset of 
 
 ---
 
-### 3. Runtime Augmentation
-
-**Option: Only offline augmentation**
-
-* **Advantages**: Fully reproducible dataset; simpler training loop.
-* **Constraints**: Limited variety → risk of overfitting.
-
-**Option: Only runtime (on-the-fly) augmentation**
-
-* **Advantages**: Fresh variations each epoch; more robust.
-* **Constraints**: Less reproducibility; slower training.
-
-**Option: Hybrid (offline + runtime)**
-
-* **Advantages**: Large reproducible base dataset + stochastic variety at training time.
-* **Constraints**: Slightly more complex setup.
-
-✅ **Decision**: **Hybrid** → offline augmentations expand dataset, runtime augmentations add randomness. Avoid horizontal flips (text orientation issue).
-
----
-
-### 4. Batch Size & Learning Rate
-
-**Option: Batch size 32, LR 1e-4 (Adam)**
-
-* **Advantages**: Stable, works for most GPUs.
-* **Constraints**: May need tuning later.
-
-**Option: Large batch (64–128)**
-
-* **Advantages**: Faster per epoch; smoother gradients.
-* **Constraints**: Higher memory requirements.
-
-**Option: Small batch (8–16)**
-
-* **Advantages**: Works on limited GPUs; more gradient noise (sometimes helps).
-* **Constraints**: Slower, noisier convergence.
-
-✅ **Decision**: Start with **batch size 32**, **LR 1e-4**, **Adam optimizer**. Adjust based on dataset scale and GPU.
-
----
-
-### 5. Early Stopping & Checkpointing
-
-**Option: No early stopping, fixed epochs**
-
-* **Advantages**: Simple.
-* **Constraints**: Risk of overfitting / wasted compute.
-
-**Option: Early stopping (monitor val loss)**
-
-* **Advantages**: Prevents overfitting; saves best model.
-* **Constraints**: Slightly more complex.
-
-**Option: Checkpoint every N epochs**
-
-* **Advantages**: Keeps rollback history.
-* **Constraints**: Higher disk usage.
-
-✅ **Decision**: Use **early stopping + best-model checkpoint**. Optionally save periodic checkpoints for debugging.
-
-## Future Considerations
-
-* **Embedding-based similarity search**:
-
-  * Train a feature extractor to produce embeddings for each card.
-  * Use cosine similarity or k-NN to identify rare/low-sample cards.
-  * Reduces dependency on large datasets for each unique card.
-
-* **Polychrome recognition**:
-
-  * Extend dataset to include polychrome variations.
-  * Add separate labels or multi-task outputs for color variants.
-
-* **Few-shot / transfer learning**:
-
-  * For new card releases or low-sample cards, leverage pretrained backbones.
-  * Fine-tune embeddings on small subsets.
-
-* **Advanced augmentations**:
-
-  * Lighting, perspective distortion, occlusion.
-  * Helps improve model generalization to real gameplay.
-
-* **Logging and experiment tracking**:
-
-  * Keep experiment metadata (hyperparameters, augmentations, results).
-  * Facilitates reproducibility and iterative improvements.
-
----
-
 ## Summary
 
 * **Data**: Begin with collection screen captures, expand with gameplay samples.
@@ -299,17 +234,14 @@ This document outlines the decisions and trade-offs for building the dataset of 
 * **Augmentation**: Hybrid (offline + runtime, no flips).
 * **Training defaults**: Batch 32, LR 1e-4, Adam, ~20 epochs.
 * **Regularization**: Early stopping + checkpointing.
-* **Future-proof**: Embeddings, few-shot learning, polychrome support, advanced augmentation.
-
-
 
 ---
 
 ## 📌 Notes
 
-- Currently supports basic image classification workflows.  
-- Polychrome recognition is experimental and may require dataset extensions.  
-- Future versions may support transfer learning or custom model architectures.  
-
-
-
+* The `train_model` module centralizes the full Balatro training workflow.
+* All CLI arguments are parsed and documented in `train.py`.
+* Compatible with **single-head** and **multi-head** models (e.g., identification, modifier).
+* Automatically handles checkpoints, scheduler steps, and early stopping.
+* Designed for flexible experimentation with consistent and reproducible setups.
+* Monitored through TensorBoard for live visualization of metrics and loss curves.

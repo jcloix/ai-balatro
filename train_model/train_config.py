@@ -61,6 +61,7 @@ class Config:
     VAL_SPLIT = 0.2
     PATIENCE = 5
     CHECKPOINT_INTERVAL = 5
+    OUTPUT_SPLIT_TRAIN_VAL = "data/split_train_val.json"
 
     # Number of classes (can be overridden at runtime)
     NUM_CLASSES = 200

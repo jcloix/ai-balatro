@@ -68,6 +68,8 @@ def parse_args():
     # ---- Scheduler params ----
     parser.add_argument("--scheduler-tmax", type=int, default=50,
                         help="T_max for CosineAnnealingLR")
+    parser.add_argument("--scheduler-eta_min", type=float, default=0.0,
+                        help="eta_min for CosineAnnealingLR")
     parser.add_argument("--scheduler-factor", type=float, default=0.1,
                         help="Factor for ReduceLROnPlateau")
     parser.add_argument("--scheduler-patience", type=int, default=5,

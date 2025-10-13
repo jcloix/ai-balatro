@@ -13,6 +13,7 @@ This module allows you to correctly group cards, assign labels, and prepare clea
 * Assign labels to each card
 * Save annotations in structured JSON format
 * Streamlit-based annotation interface
+* Can use inference from pre-trained model to pre-fill data
 
 ---
 
@@ -21,15 +22,22 @@ This module allows you to correctly group cards, assign labels, and prepare clea
 Make sure you are inside the Balatro project folder and dependencies are installed:
 
 ```bash
-cd balatro
 pip install -r requirements.txt
 ```
+
+Move the desired cards from the `data/screenshots` to the `data/dataset_default` folder.
 
 ---
 
 ## 🎯 Usage
 
-### 1️⃣ Annotate the dataset
+### 1️⃣ (Optional) Use pre-trained model to make inference
+This saves the inference.json with the predictions of the pre-trained model. Usually this step is done after having already trained a simple model and more data is required to train a better model.
+```bash
+python -m utils.inference_utils --img-dir "data/dataset_default" --task-name identification --topk 2 --out-json "data/dataset_default/inference.json" --checkpoint "data/models/best_model.pth"
+```
+
+### 2️⃣ Annotate the dataset
 This launches the annotation interface in your browser:
 
 ```bash
@@ -40,9 +48,9 @@ Follow the on-screen interface to:
 
 1. View card groups and individual cards.
 2. Label cards with name, type, rarity, and modifier.
-3. Save your annotations. All labels are stored in a JSON file (`LABELS_FILE`) ready for training.
+3. Save your annotations. All labels are stored in a JSON file (`data/dataset_default/labels.json`) ready for training.
 
-### 2️⃣ Annotate the dataset
+### 3️⃣ (Optional) Verify the dataset
 
 Verify the annotations
 
@@ -61,110 +69,6 @@ This page displays:
 
 ## 📌 Notes
 
-* A minimal CLI is provided, but the Streamlit interface is recommended for labeling efficiency.
+* The Streamlit interface is recommended for labeling efficiency.
 * Annotations are saved automatically upon pressing the **Save Labels** button.
 * Helper selectboxes and auto-fill features are available for common card names.
-
----
-## Training Strategies for Card Recognition
-
-Since we have many **unique cards** (Jokers, Tarots, Planets, Spectrals), collecting
-20–50 real images for each one would be too time-consuming.  
-Here are recommended strategies to make the dataset practical:
-
-### 1️⃣ Few-shot / Transfer Learning
-Use a pretrained vision model (e.g. **ResNet**, **EfficientNet**, **Vision Transformer**) and fine-tune it.
-These models can often learn new categories with **<10 samples per class** if the images are visually distinct.
-
-### 2️⃣ Feature Extraction + Similarity Search
-Instead of training a classifier with 175 classes:
-- Train or use a pretrained model to generate **embeddings** (vector representations of images).
-- Store embeddings of your labeled reference cards.
-- For a new card, compute its embedding and use **cosine similarity** or **k-NN lookup**
-  to find the closest match.
-This way you only need **a few reference images per card**, not thousands.
-
-**Minimal Example: Embeddings + k-NN Lookup**
-```python
-import torch
-import torchvision.models as models
-import torchvision.transforms as T
-from PIL import Image
-from sklearn.neighbors import NearestNeighbors
-import numpy as np
-
-# 1. Load a pretrained model (ResNet50) and remove the classifier head
-model = models.resnet50(pretrained=True)
-model.fc = torch.nn.Identity()  # output = embedding vector
-model.eval()
-
-# 2. Define preprocessing (resize, normalize)
-transform = T.Compose([
-    T.Resize((224, 224)),
-    T.ToTensor(),
-    T.Normalize(mean=[0.485, 0.456, 0.406],
-                std=[0.229, 0.224, 0.225])
-])
-
-def get_embedding(img_path):
-    img = Image.open(img_path).convert("RGB")
-    x = transform(img).unsqueeze(0)  # add batch dim
-    with torch.no_grad():
-        emb = model(x).squeeze().numpy()
-    return emb
-
-# 3. Build reference database
-labels = ["Joker_A", "Joker_B", "Tarot_X"]
-paths  = ["cards/joker_a.png", "cards/joker_b.png", "cards/tarot_x.png"]
-
-embeddings = np.array([get_embedding(p) for p in paths])
-
-# k-NN search
-knn = NearestNeighbors(n_neighbors=1, metric="cosine")
-knn.fit(embeddings)
-
-# 4. Query with a new image
-query_emb = get_embedding("cards/query.png")
-dist, idx = knn.kneighbors([query_emb])
-print("Predicted card:", labels[idx[0][0]], " (similarity =", 1 - dist[0][0], ")")
-```
-
-### 3️⃣ Augmentation-heavy Training
-If you only have 1–3 screenshots per card:
-- Apply strong augmentations (cropping, resizing, rotations, brightness/contrast shifts,
-  blur, noise).
-- Each original can yield **20+ synthetic variations**, expanding your dataset.
-**Minimal Example: Torchvision Augmentations**
-```python
-from torchvision import transforms
-from PIL import Image
-import random, os
-
-augment = transforms.Compose([
-    transforms.RandomResizedCrop(224, scale=(0.8, 1.0)),
-    transforms.RandomRotation(15),
-    transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1),
-    transforms.RandomHorizontalFlip(),
-    transforms.RandomApply([transforms.GaussianBlur(3)], p=0.3),
-    transforms.ToTensor(),
-])
-
-img = Image.open("cards/joker_a.png").convert("RGB")
-
-# Generate 20 augmented variations
-os.makedirs("augmented", exist_ok=True)
-for i in range(20):
-    aug_img = augment(img)
-    transforms.ToPILImage()(aug_img).save(f"augmented/joker_a_aug_{i}.png")
-
-```
-
-### 4️⃣ Progressive Approach
-Don’t label all 175 unique cards at once:
-- Start with a small subset (e.g. **10 Jokers + 5 Tarots**) and build the full pipeline.
-- Once working, gradually add more cards.
-- This avoids being blocked by the full dataset size.
-
----
-✅ Recommendation: Combine **augmentation** + **embeddings with similarity search**.  
-This gives strong performance with minimal manual labeling effort.

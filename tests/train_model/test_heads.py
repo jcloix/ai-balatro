@@ -42,8 +42,8 @@ def test_subclass_defaults_override():
     # Subclass defaults override parent DEFAULTS
     assert type(id_head.train_transform) != type(mod_head.train_transform) or id_head.val_split != mod_head.val_split
 
-@patch("train_model.heads.CardDataset.from_labels_dict")
-@patch("train_model.heads.get_train_val_loaders")
+@patch("train_model.task.heads.CardDataset.from_labels_dict")
+@patch("train_model.task.heads.get_train_val_loaders")
 def test_load_dataloaders(mock_get_loaders, mock_dataset):
     dummy_dataset = MagicMock()
     mock_dataset.side_effect = [dummy_dataset, dummy_dataset]
@@ -68,7 +68,7 @@ def test_load_json_reads_files(temp_labels_files):
     assert "img1.png" in labels
     assert "img3.png" in aug_labels
 
-@patch("train_model.heads.stratified_split_with_aug")
+@patch("train_model.task.heads.stratified_split_with_aug")
 def test_split_labels_called(mock_split):
     mock_split.return_value = ({"train": "t"}, {"val": "v"})
     head = ClassificationHead("test_head")
@@ -77,8 +77,8 @@ def test_split_labels_called(mock_split):
     assert train_labels == {"train": "t"}
     assert val_labels == {"val": "v"}
 
-@patch("train_model.heads.CardDataset.from_labels_dict")
-@patch("train_model.heads.get_train_val_loaders")
+@patch("train_model.task.heads.CardDataset.from_labels_dict")
+@patch("train_model.task.heads.get_train_val_loaders")
 def test_build_datasets_sets_class_names_and_num_classes(mock_get_loaders, mock_dataset):
     dummy_train_dataset = MagicMock()
     dummy_val_dataset = MagicMock()
@@ -97,7 +97,7 @@ def test_build_datasets_sets_class_names_and_num_classes(mock_get_loaders, mock_
     assert head.class_names == ["A", "B"]
     assert head.num_classes == 2
 
-@patch("train_model.heads.get_train_val_loaders")
+@patch("train_model.task.heads.get_train_val_loaders")
 def test_get_dataloaders_pass_args(mock_get_loaders):
     mock_get_loaders.return_value = ("train_loader", "val_loader")
     head = ClassificationHead("test_head")
@@ -110,7 +110,9 @@ def test_get_dataloaders_pass_args(mock_get_loaders):
 
 def test_build_criterion_returns_cross_entropy():
     head = ClassificationHead("test_head")
-    criterion = head.build_criterion()
+    dummy_model = None
+    dummy_device = "cpu"
+    criterion = head.build_criterion(dummy_model, dummy_device)
     assert isinstance(criterion, nn.CrossEntropyLoss)
 
 def test_subclass_defaults_minimal_config():

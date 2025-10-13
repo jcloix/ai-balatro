@@ -55,7 +55,7 @@ class StrategyFactory:
     # -----------------------------
     def build_scheduler(self):
         mapping = {
-            "cosine": CosineAnnealing(T_max=self.args.scheduler_tmax),
+            "cosine": CosineAnnealing(T_max=self.args.scheduler_tmax, eta_min=self.args.scheduler_eta_min),
             "plateau": ReduceLROnPlateau(
                 factor=self.args.scheduler_factor,
                 patience=self.args.scheduler_patience

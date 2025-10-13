@@ -11,7 +11,7 @@ Balatro performs instance-level card identification: the AI learns to recognize 
 
 - Capture card screenshots and organize a dataset
 - Annotate cards with proper labels
-- Train an AI model to identify cards and their polychrome
+- Train an AI model to identify cards and their modifiers
 - Identify cards in real-time scenarios
 - Useful utility functions for automated card detection
 
@@ -28,8 +28,8 @@ Balatro performs instance-level card identification: the AI learns to recognize 
 - **train_model**  
   Train AI models to identify cards and recognize polychrome.
 
-- **identify_card**  
-  Functions for real-time card identification.
+- **models**  
+  Models of the project to share it between the modules. Used to the MultiHeadModel
 
 - **utils**  
   Helper functions, e.g., check if a specific `<card_id>` is displayed on the screen.
@@ -44,7 +44,6 @@ Balatro performs instance-level card identification: the AI learns to recognize 
 Make sure Python 3.10+ is installed. Then:
 
 ```bash
-TODO
 git clone https://github.com/yourusername/balatro.git
 cd balatro
 pip install -r requirements.txt
@@ -69,10 +68,6 @@ python -m annotate_dataset
 python -m train_model
 ```
 
-### 4️⃣ Identify cards in real scenario
-```bash
-python -m identify_card
-```
 
 ### 5️⃣ Use helper functions
 ```python
@@ -136,7 +131,7 @@ if is_card_displayed("card_123"):
                         │   highlight cards]│
                         └────────┬──────────┘
                                  │
-                 Detected Cards / Polychrome Info
+                 Detected Cards / Modifiers Info
                                  │
                         ┌────────▼──────────┐
                         │      utils        │
@@ -146,9 +141,9 @@ if is_card_displayed("card_123"):
                         └───────────────────┘
 
 
-## Detailed Step-by-Step Workflow
+## Detailed Step-by-Step Workflow for training
 
-### 1️⃣ Data Preparation
+### 1️⃣ Data Preparation 
 
 1. **Capture raw screenshots**
 
@@ -158,8 +153,8 @@ if is_card_displayed("card_123"):
 2. **Annotate dataset**
 
    * Use `annotate_dataset` to label each card.
-   * Labels stored in `data/labels.json`.
-   * Each card gets unique ID, type, rarity, and modifier.
+   * Labels stored in `data/dataset_default/labels.json`.
+   * (Optional) the inference can help pre-fill the fields
 
 3. **Optional offline data augmentation**
 
@@ -167,22 +162,54 @@ if is_card_displayed("card_123"):
    * Augmented images stored in `data/augmented/`.
    * Metadata stored in `data/augmented.json`.
 
-4. **Merge labels**
-
-   * Combine original + augmented labels in memory (Done in the train_model module).
-   * Result: `merged_labels.json` used for training.
 
 ---
 
-### 2️⃣ Dataset Loading
+### 2️⃣ Load existing checkpoint if requested 
 
-1. Initialize `CardDataset`
+1. Load existing checkpoint if any 
+
+   * Loads checkpoint if provided to continue the training of an existing model
+   * The checkpoints contain the following
+   ```python
+   checkpoint = {
+        "epoch": epoch,
+        "model": training_state.model.state_dict(),
+        "optimizer": training_state.optimizer.state_dict(),
+        "scheduler": training_state.scheduler.state_dict() if training_state.scheduler else None,
+        "scaler": training_state.scaler.state_dict() if training_state.scaler else None,
+        "head_states": {}
+        "head_states":{
+            "identification":{
+               "class_names":170
+            },
+            "modifier":{
+               "class_names":5
+            }
+        }
+    }
+   ```
+
+
+### 3️⃣ Dataset Loading
+
+1. Prepare the correct task(s) to execute
+
+   * Each task represent a goal for the model to learn, by default it is "identification" and "modifier"
+   * When multi tasks are provided, the model will have multiple heads with each task
+
+2. Initialize the strategy to use
+
+   * Prepare the strategy (frozen, ptimizer and scheduler) to be use for the training
+   * Strategy can be easily configurable via run arguments
+
+3. Initialize `CardDataset`
 
    * Loads image paths + labels from the merged JSON mapping in memory.
    * Provide the image paths that will be loaded and transformed on-the-fly when accessed by the DataLoader during training or validation.
    * Define the image transforms (augmentation, normalization, resizing) that will be applied later for training and validation.
 
-2. Split into training and validation sets
+4. Split into training and validation sets
 
    * Split the dataset into training and validation subsets using `Config.VAL_SPLIT`.
    * Create DataLoaders for each subset:
@@ -190,13 +217,13 @@ if is_card_displayed("card_123"):
      * Train loader → shuffled, batched.
      * Validation loader → not shuffled, batched.
 
-3. **Optional Weighted Sampler**
+5. **Optional Weighted Sampler**
 
    * If `use_weighted_sampler` is enabled, balance class distribution in the training loader.
 
 ---
 
-### 3️⃣ Initialize Model and Training Parameters
+### 4️⃣ Initialize Model and Training Parameters
 
 1. **Load pretrained ResNet18 (convolutional neural network)**
 
@@ -233,11 +260,11 @@ model.fc = nn.Linear(num_features, NUM_CLASSES)
 
 ---
 
-### 4️⃣ Training Loop
+### 5️⃣ Training Loop
 
 For each epoch:
 
-1. **Train one epoch**
+1. **Train one epoch per head**
 
    * Iterate through training loader batches.
    * Move images + labels to device (GPU or CPU).
@@ -247,14 +274,14 @@ For each epoch:
    * Optimizer step → update weights.
    * Compute average training loss.
 
-2. **Validate**
+2. **Validate per head**
 
    * Iterate through validation loader batches.
    * Forward pass only (no gradients).
    * Compute validation loss and metrics (Top-K accuracy, confusion matrix).
    * Average validation loss.
 
-3. **Logging**
+3. **Logging per head**
 
    * Print epoch stats (train_loss, val_loss, metrics).
    * Optional: log to TensorBoard.
@@ -275,7 +302,7 @@ For each epoch:
 
 ---
 
-### 5️⃣ End of Training
+### 6️⃣ End of Training
 
 1. Save final model (optional).
 2. Model ready for inference, embedding extraction, or further fine-tuning.
@@ -297,8 +324,8 @@ Balatro keeps a strict separation between **raw data**, **annotations**, **augme
 ### 1. **Raw Data**
 
 ```
-data/unlabeled/*.png
-data/unlabeled/seen_hashes.json
+data/screenshots/*.png
+data/screenshots/seen_hashes.json
 ```
 
 * All collected screenshots from gameplay.
@@ -310,7 +337,7 @@ data/unlabeled/seen_hashes.json
 ### 2. **Annotations**
 
 ```
-data/cards/labels.json
+data/dataset_default/labels.json
 ```
 * Data are moved into data/cards
 * Human-provided labels for each raw image.
@@ -361,31 +388,12 @@ data/augmented/augmented.json
 
 ---
 
-### 4. **Experiment Subsets (Optional)**
-
-```
-data/test_subset/*.png
-```
-
-* Used to experiment with augmentation scripts.
-* Temporary, can be safely deleted or regenerated.
-* Augmented images from this subset will appear in `data/augmented/`.
-
----
-
-### 5. **Training Dataset (Merged in Memory)**
-
-* During training, both original and augmented images are fed into your DataLoader.
-* The two JSON files (`data/labels.json` and `data/augmented.json`) are merged **in memory** to create a unified mapping from filenames to labels.
-* This avoids copying or duplicating images while keeping training reproducible.
-
 ---
 
 ### 🔑 Key Principles
 
-* **Raw stays raw** → `data/unlabeled` is immutable.
-* **Metadata centralized** → originals: `data/cards/labels.json`, augmentations: `data/augmented/augmented.json`.
-* **Training is reproducible** → merge the two JSONs in memory and feed both folders to your DataLoader.
+* **Raw stays raw** → `data/screenshots` contains unlabeled images only.
+* **Metadata centralized** → Move originals cards into `data/dataset_default`. JSON original labels: `data/dataset_default/labels.json`, augmentations: `data/augmented/augmented.json`.
 
 ---
 

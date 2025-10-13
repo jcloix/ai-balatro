@@ -24,6 +24,32 @@ def small_loader(small_dataset):
     return DataLoader(small_dataset, batch_size=2)
 
 # --------------------------
+# Dummy wrappers
+# --------------------------
+class DummyHead:
+    def __init__(self, loader):
+        self.train_loader = loader
+        self.val_loader = loader
+        self.criterion = nn.CrossEntropyLoss()
+        self.name = "dummy"
+        self.metrics = None  # or mock if needed
+
+class DummyState:
+    def __init__(self, model, optimizer, device="cpu", scaler=None):
+        self.model = model
+        self.optimizer = optimizer
+        self.device = device
+        self.scaler = scaler
+
+class DummyEpochResult:
+    def set_train(self, train_loss):
+        self.train_loss = train_loss
+    def set_val(self, val_loss, val_outputs=None, val_labels=None):
+        self.val_loss = val_loss
+        self.val_outputs = val_outputs
+        self.val_labels = val_labels
+
+# --------------------------
 # Forward / Backward Tests
 # --------------------------
 def test_forward_backward_no_scaler(dummy_model):
@@ -50,7 +76,6 @@ def test_forward_backward_with_dummy_scaler(dummy_model):
     outputs, loss = train_loops.forward_pass(dummy_model, x, y, criterion, scaler=scaler)
     train_loops.backward_step(loss, optimizer, scaler=scaler)
 
-    # Ensure scaler methods are called
     scaler.scale.assert_called_with(loss)
     scaler.step.assert_called_with(optimizer)
     scaler.update.assert_called()
@@ -59,53 +84,58 @@ def test_forward_backward_with_dummy_scaler(dummy_model):
 # Training / Validation Tests
 # --------------------------
 def test_train_one_epoch_returns_loss(dummy_model, small_loader):
-    criterion = nn.CrossEntropyLoss()
+    head = DummyHead(small_loader)
     optimizer = optim.Adam(dummy_model.parameters())
-    device = torch.device("cpu")
+    state = DummyState(dummy_model, optimizer)
+    epoch_res = DummyEpochResult()
 
-    loss = train_loops.train_one_epoch(dummy_model, small_loader, criterion, optimizer, device)
+    # Patch unwrap_model to return the model output directly for dummy model
+    with patch("train_model.train_loops.unwrap_model", side_effect=lambda m, x, task_name=None: m(x)):
+        loss = train_loops.train_one_epoch(head, state, epoch_res)
+
     assert loss >= 0
+    assert hasattr(epoch_res, "train_loss")
 
 def test_validate_returns_metrics(dummy_model, small_loader):
-    criterion = nn.CrossEntropyLoss()
-    device = torch.device("cpu")
+    head = DummyHead(small_loader)
+    optimizer = optim.Adam(dummy_model.parameters())
+    state = DummyState(dummy_model, optimizer)
+    epoch_res = DummyEpochResult()
 
-    # Compute metrics
-    metrics = train_loops.validate(dummy_model, small_loader, criterion, device, compute_metrics=True, num_classes=3)
+    # Patch unwrap_model to return the tensor directly
+    with patch("train_model.train_loops.unwrap_model", side_effect=lambda m, x, task_name=None: m(x)):
+        val_loss = train_loops.validate(head, state, epoch_res)
 
-    # Check metrics attributes
-    assert metrics.val_loss >= 0
-    assert metrics.topk_acc is not None
-    assert metrics.cm.shape == (3, 3)
+    assert val_loss >= 0
+    assert hasattr(epoch_res, "val_loss")
+    assert hasattr(epoch_res, "val_outputs")
+    assert hasattr(epoch_res, "val_labels")
 
-def test_validate_no_metrics(dummy_model, small_loader):
-    criterion = nn.CrossEntropyLoss()
-    device = torch.device("cpu")
+    # Check that lists exist (they might be empty if loader is empty)
+    assert isinstance(epoch_res.val_outputs, list)
+    assert isinstance(epoch_res.val_labels, list)
 
-    metrics = train_loops.validate(dummy_model, small_loader, criterion, device, compute_metrics=False)
-    assert metrics.val_loss >= 0
-    assert metrics.topk_acc is None
-    assert metrics.cm is None
+    # Only check contents if non-empty
+    if len(epoch_res.val_labels) > 0:
+        first_batch_labels = next(iter(small_loader))[1]
+        assert torch.equal(epoch_res.val_labels[0], first_batch_labels)
 
-# --------------------------
-# Edge Case Tests
-# --------------------------
 def test_train_one_epoch_empty_loader(dummy_model):
     empty_loader = []
-    criterion = nn.CrossEntropyLoss()
+    head = DummyHead(empty_loader)
     optimizer = optim.Adam(dummy_model.parameters())
-    device = torch.device("cpu")
+    state = DummyState(dummy_model, optimizer)
+    epoch_res = DummyEpochResult()
 
-    # Should handle gracefully without error
-    loss = train_loops.train_one_epoch(dummy_model, empty_loader, criterion, optimizer, device)
-    assert loss == 0 or loss is None  # depending on implementation
+    loss = train_loops.train_one_epoch(head, state, epoch_res)
+    assert loss == 0.0
 
 def test_validate_empty_loader(dummy_model):
     empty_loader = []
-    criterion = nn.CrossEntropyLoss()
-    device = torch.device("cpu")
+    head = DummyHead(empty_loader)
+    optimizer = optim.Adam(dummy_model.parameters())
+    state = DummyState(dummy_model, optimizer)
+    epoch_res = DummyEpochResult()
 
-    metrics = train_loops.validate(dummy_model, empty_loader, criterion, device, compute_metrics=True, num_classes=3)
-    assert metrics.val_loss == 0 or metrics.val_loss is None
-    assert metrics.topk_acc is None or metrics.topk_acc == 0
-    assert metrics.cm is None
+    val_loss = train_loops.validate(head, state, epoch_res)
+    assert val_loss == 0.0

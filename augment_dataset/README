@@ -10,12 +10,13 @@ This allows your AI model to **learn robust representations** even with a small 
 
 * Load labeled images from the dataset (`annotate_dataset`)
 * Apply a variety of augmentations:
-
   * Rotation
   * Cropping / resizing
   * Flipping (horizontal/vertical)
   * Brightness and contrast adjustments
   * Blur and noise
+  * Negative
+* Allow to balance the augmentation related to a field
 * Save augmented images with the same labeling metadata
 * Configurable augmentation parameters for flexibility
 
@@ -26,7 +27,6 @@ This allows your AI model to **learn robust representations** even with a small 
 Make sure you are inside the Balatro project folder and dependencies are installed:
 
 ```bash
-cd balatro
 pip install -r requirements.txt
 ```
 
@@ -46,7 +46,7 @@ Or with custom parameters:
 
 ```bash
 python -m augment_dataset.main --input data/test_subset --n 5 --seed 42
-python -m augment_dataset.main --input data/test_negative --output data/augment_negative --n 2 --seed 42
+python -m augment_dataset.main --input data/dataset_default --output data/augmented_identity --labels data/dataset_default/labels.json --no-blur --no-bc --balance-by name
 ```
 
 The script will:
@@ -68,6 +68,10 @@ Run the script to create `data/augmented.json` with metadata for all augmented i
 
 ```bash
 python -m augment_dataset.save_augmented_labels
+```
+Or with parameters
+```bash
+python -m augment_dataset.save_augmented_labels --aug-dir "data/augmented" --labels "data/augmented/augmented.json"
 ```
 
 The script will:
@@ -91,21 +95,3 @@ This JSON will be used later in the training pipeline and can be merged in memor
   * Output folder for augmented images
 * Augmentation is optional, but **highly recommended** if you have few images per card
 * The augmented images can then be used in `train_model` to improve AI performance
-
----
-
-## 🤝 Contributing
-
-Feel free to contribute by:
-
-* Adding new augmentation types
-* Improving augmentation efficiency
-* Adding logging or progress display
-
-Open issues or pull requests are welcome.
-
----
-
-## 📄 License
-
-Specify your license here (MIT, GPL, etc.).

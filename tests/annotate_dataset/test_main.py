@@ -2,17 +2,15 @@
 import unittest
 from unittest.mock import patch, MagicMock
 from annotate_dataset import main
-from types import SimpleNamespace
+import os
 
 class TestMain(unittest.TestCase):
 
     @patch("annotate_dataset.main.st")
     @patch("annotate_dataset.main.display_card")
     @patch("annotate_dataset.main.helper_selectboxes")
-    @patch("annotate_dataset.main.parse_ids")
-    def test_display_main_card_and_inputs_form(self, mock_parse_ids, mock_helpers, mock_display_card, mock_st):
-        # Setup
-        mock_parse_ids.return_value = (1, 10)
+    def test_display_main_card_and_inputs_form(self, mock_helpers, mock_display_card, mock_st):
+        # Setup session_state
         mock_st.session_state = {
             "card_name": "",
             "card_type": "Joker",
@@ -21,28 +19,40 @@ class TestMain(unittest.TestCase):
             "group_section": {},
             "cluster_section": {}
         }
+
         labels = {"file1.png": {"name": "Card1", "type": "Joker"}}
         unique_by_type = {"Joker": ["Card1"], "Planet": [], "Tarot": [], "Spectral": []}
-        
-        # Run inputs_form
+
+        # Run the function
         main.inputs_form(labels, unique_by_type)
-        mock_helpers.assert_called_once()  # helper_selectboxes called
+
+        # Ensure helper_selectboxes was called
+        mock_helpers.assert_called_once()
+
 
     @patch("annotate_dataset.main.st")
     @patch("annotate_dataset.main.display_card")
-    @patch("annotate_dataset.main.parse_ids")
-    def test_display_main_card(self, mock_parse_ids, mock_display_card, mock_st):
-        mock_parse_ids.return_value = (1, 10)
-        mock_st.session_state = {}
-        main.display_main_card("file1.png", 10, 1)
-        mock_display_card.assert_called_once()
+    def test_display_main_card(self, mock_display_card, mock_st):
+        mock_st.session_state = {}  # optional if function uses session_state
+        current_file = "file1.png"
 
-    from types import SimpleNamespace
+        main.display_main_card(current_file)
+
+        # Check that display_card was called with correct path
+        mock_display_card.assert_called_once_with(
+            os.path.join(main.DATASET_DIR, current_file),
+            width=200
+        )
+        # Optional: check that st.title and st.subheader were called
+        mock_st.title.assert_called_once_with(f"Label Card : {current_file}")
+        mock_st.subheader.assert_called_once_with("Current Card")
 
     @patch("annotate_dataset.main.st")
+    @patch("annotate_dataset.main.Path")  # mock Path(DATASET_DIR)/f
     @patch("builtins.open", new_callable=MagicMock)
-    def test_display_save_button(self, mock_open_file, mock_st):
-        # Setup session_state as a plain dict
+    @patch("annotate_dataset.main.clear_fields")  # mock clear_fields
+    def test_display_save_button(self, mock_clear_fields, mock_open_file, mock_path, mock_st):
+        # Setup session_state
         mock_st.session_state = {
             "card_name": "CardX",
             "card_type": "Joker",
@@ -50,30 +60,35 @@ class TestMain(unittest.TestCase):
             "card_modifier": "Base",
             "group_section": {"file1.png": True},
             "cluster_section": {},
-            "group_idx": 0
+            "group_idx": 0,
+            "group_file1.png": True  # simulate checkbox key
         }
 
-        # Patch button and rerun
+        # Patch button to simulate click
         mock_st.button.return_value = True
-        mock_st.rerun = lambda: None  # avoid Streamlit rerun
+        mock_st.rerun = lambda: None
+
+        # Mock Path to return dummy path string
+        mock_path.return_value.__truediv__.return_value = "dummy/full_path/file1.png"
 
         labels = {}
 
-        # Call the function
-        main.display_save_button(cluster_id=1, current_group_id=10, labels=labels)
+        main.display_save_button(labels)
 
-        # Assert labels were updated
+        # Check labels updated
         assert "file1.png" in labels
         assert labels["file1.png"]["name"] == "CardX"
         assert labels["file1.png"]["type"] == "Joker"
         assert labels["file1.png"]["rarity"] == "Rare"
         assert labels["file1.png"]["modifier"] == "Base"
-        assert labels["file1.png"]["cluster"] == 1
-        assert labels["file1.png"]["card_group"] == 10
+        assert labels["file1.png"]["full_path"] == "dummy/full_path/file1.png"
 
-        # Assert session_state reset
+        # Check session_state reset
         assert mock_st.session_state["group_section"] == {}
         assert mock_st.session_state["cluster_section"] == {}
+        assert mock_st.session_state["group_idx"] == 1
+
+
 
 
     @patch("annotate_dataset.main.st")
@@ -86,6 +101,9 @@ class TestMain(unittest.TestCase):
         }
         # Mock checkbox to always return True
         mock_st.checkbox.return_value = True
+
+        # Mock columns to return 3 MagicMocks for unpacking
+        mock_st.columns.return_value = [MagicMock(), MagicMock(), MagicMock()]
 
         group_files = ["f1.png", "f2.png"]
         labels = {}

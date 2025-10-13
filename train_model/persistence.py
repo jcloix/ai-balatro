@@ -49,7 +49,11 @@ def load_checkpoint(path):
 def apply_checkpoint(checkpoint, model=None, optimizer=None, scheduler=None, scaler=None):
     """Apply checkpoint to provided objects. Returns start_epoch."""
     if model is not None:
-        model.load_state_dict(checkpoint["model"])
+        missing_keys, unexpected_keys = model.load_state_dict(checkpoint["model"], strict=False)
+        if missing_keys:
+            print(f"[Checkpoint] Missing keys (ignored): {missing_keys}")
+        if unexpected_keys:
+            print(f"[Checkpoint] Unexpected keys (ignored): {unexpected_keys}")
     if optimizer is not None and "optimizer" in checkpoint:
         safe_load_optimizer_state(optimizer, checkpoint["optimizer"])
     if scheduler is not None and "scheduler" in checkpoint and checkpoint["scheduler"] is not None:

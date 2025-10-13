@@ -2,6 +2,7 @@ import os
 import json
 import re
 import argparse
+from config.config import AUGMENTED_LABELS_FILE, DATASET_AUGMENTED_DIR
 
 
 def load_original_labels(labels_file):
@@ -45,11 +46,11 @@ def build_augmented_labels(augmented_dir, original_labels):
 def main():
     parser = argparse.ArgumentParser(description="Generate augmented labels JSON")
     parser.add_argument(
-        "--aug-dir", type=str, required=True,
+        "--aug-dir", type=str, default=DATASET_AUGMENTED_DIR,
         help="Directory containing augmented images"
     )
     parser.add_argument(
-        "--labels", type=str, required=True,
+        "--labels", type=str, default=AUGMENTED_LABELS_FILE,
         help="Original labels.json file"
     )
     args = parser.parse_args()

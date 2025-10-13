@@ -85,3 +85,7 @@ class NoScheduler(SchedulerStrategy):
 
     def step(self, epoch_val_loss=None):
         pass
+
+    def state_dict(self):
+        # Return empty dict so saving always works
+        return {}

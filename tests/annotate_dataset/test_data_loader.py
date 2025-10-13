@@ -43,23 +43,36 @@ def test_parse_ids():
 # build_maps
 # ---------------------------
 def test_build_maps():
-    images = ["cluster1_card1_sample.png", "cluster1_card2_sample.png", "cluster2_card3_sample.png"]
-    cg_map, cl_map = build_maps(images)
+    images = [
+        "cluster1_card1_sample.png",
+        "cluster1_card2_sample.png",
+        "cluster2_card3_sample.png"
+    ]
 
-    # card_group_map keys = card group IDs
-    assert set(cg_map.keys()) == {1, 2, 3}
+    class DummyMaps:
+        def __init__(self, *args, **kwargs):
+            self.group_map = {
+                1: ["cluster1_card1_sample.png"],
+                2: ["cluster1_card2_sample.png"],
+                3: ["cluster2_card3_sample.png"],
+            }
+            self.cluster_map = {
+                1: ["cluster1_card1_sample.png", "cluster1_card2_sample.png"],
+                2: ["cluster2_card3_sample.png"],
+            }
+            self.file_map = {}
+            self.prefill_map = {}
+        def build(self, all_images):
+            return self
 
-    # cluster_map keys = cluster IDs
-    assert set(cl_map.keys()) == {1, 2}
+    with patch("annotate_dataset.data_loader.InferenceMaps", DummyMaps):
+        maps_obj = build_maps(images)
 
-    # card_group_map contents
-    assert cg_map[1] == ["cluster1_card1_sample.png"]
-    assert cg_map[2] == ["cluster1_card2_sample.png"]
-    assert cg_map[3] == ["cluster2_card3_sample.png"]
-
-    # cluster_map contents
-    assert set(cl_map[1]) == {"cluster1_card1_sample.png", "cluster1_card2_sample.png"}
-    assert cl_map[2] == ["cluster2_card3_sample.png"]
+    # Assertions
+    assert set(maps_obj.group_map.keys()) == {1, 2, 3}
+    assert set(maps_obj.cluster_map.keys()) == {1, 2}
+    assert maps_obj.group_map[1] == ["cluster1_card1_sample.png"]
+    assert maps_obj.cluster_map[2] == ["cluster2_card3_sample.png"]
 
 # ---------------------------
 # get_unlabeled_groups

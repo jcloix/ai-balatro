@@ -91,7 +91,7 @@ class AugmentConfig:
                              flip=self.flip,
                              brightness_contrast=self.brightness_contrast,
                              blur_noise=self.blur_noise,
-                             negative=self.negative)
+                             negative=False)
 
 
 # ============================================================
@@ -125,11 +125,11 @@ class DatasetAugmentor:
             return self._compute_n_abs_aug(count)
         return self._compute_n_relative_aug(count, all_counts)
 
-    def _compute_n_abs_aug(self, count, min_aug=2, max_aug=20):
+    def _compute_n_abs_aug(self, count, min_aug=3, max_aug=20):
         if count >= 15:
             return min_aug
         elif count >= 5:
-            return 8
+            return 12
         else:
             return max_aug
     
@@ -189,3 +189,12 @@ class DatasetAugmentor:
                     aug_img = self.config.apply(image)
                     out_path = os.path.join(self.output_dir, f"{base}_aug{i}{ext}")
                     aug_img.save(out_path)
+                #Always add one negative filter
+                aug_img = augment_image(image,
+                             rotate=self.config.rotate,
+                             flip=self.config.flip,
+                             negative=self.config.negative)
+                out_path = os.path.join(self.output_dir, f"{base}_aug{i}{ext}")
+                aug_img.save(out_path)
+                
+                

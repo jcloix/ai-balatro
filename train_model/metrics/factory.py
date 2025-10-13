@@ -4,9 +4,7 @@ from train_model.metrics.metrics import TopKAccuracy, ConfusionMatrix, EpochSumm
 def create_metrics(metric_names):
     metrics = [EpochSummary()]  # mandatory, prints train + val loss
     for name in metric_names:
-        if name == "loss":
-            metrics.append(LossMetric())
-        elif name == "top1_acc":
+        if name == "top1_acc":
             metrics.append(TopKAccuracy(k=1))
         elif name == "top3_acc":
             metrics.append(TopKAccuracy(k=3))

@@ -104,10 +104,10 @@ class ClassificationHead(ABC):
 @register_head("identification")
 class IdentificationHead(ClassificationHead):
     DEFAULTS = {
-        "val_split":0.15,
-        "train_transform":"heavy",
+        "val_split":0.2,
+        "train_transform":"train",
         "val_transform":"test",
-        "labels_file":LABELS_FILE,
+        "labels_file":"data/dataset_default/labels.json",
         "augmented_labels_file":"data/augmented_identity/augmented.json",
         "metrics": ["top1_acc","confusion_summary"], #too many classes so "cm" is not appropirate  
     }
