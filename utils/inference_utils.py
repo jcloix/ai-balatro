@@ -39,13 +39,24 @@ def load_model(checkpoint_path, device=None):
 # -----------------------------
 # Preprocess image
 # -----------------------------
-def preprocess_image(image_path, size=(224, 224)):
-    img = Image.open(image_path).convert("RGB")
+def preprocess_image(image, size=(224, 224)):
+    """
+    Preprocess an image for the model.
+    Accepts either a PIL.Image or a file path.
+    """
+    if isinstance(image, str):
+        img = Image.open(image).convert("RGB")
+    elif isinstance(image, Image.Image):
+        img = image.convert("RGB")
+    else:
+        raise ValueError(f"Invalid input type for preprocess_image: {type(image)}")
+
     transform = transforms.Compose([
         transforms.Resize(size),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
+
     return transform(img).unsqueeze(0)
 
 # -----------------------------

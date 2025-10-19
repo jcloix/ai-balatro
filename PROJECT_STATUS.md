@@ -4,8 +4,8 @@
 - build_dataset: capture screenshots
 - annotate_dataset: labeling UI
 - augment_dataset: data augmentation 
-- train_model: AI training (Finished)
-- identify_card: real-time inference 
+- models: shared models
+- train_model: AI training 
 - utils: shared helpers
 - config: Global configuration
 
